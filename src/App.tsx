@@ -4,6 +4,7 @@ import { PersonRow } from './components/PersonRow'
 import { PersonSheet } from './components/PersonSheet'
 import { ValueSheet, type ValueResult } from './components/ValueSheet'
 import { Toast } from './components/Toast'
+import { DemoNotice } from './components/DemoNotice'
 import { ButterflyMark } from './components/Primitives'
 import { exportDb, loadDb, parseImportedDb, saveDb, uid } from './lib/storage'
 import { centsToNumber } from './lib/money'
@@ -555,6 +556,8 @@ export default function App() {
       ) : null}
 
       <Toast message={toast} onDone={() => setToast('')} />
+
+      {__DEMO__ ? <DemoNotice /> : null}
     </div>
   )
 }

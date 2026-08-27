@@ -49,6 +49,11 @@ export function Sidebar({ onExport }: { onExport: () => void }) {
       </nav>
 
       <div className="mt-auto flex flex-col gap-1.5 px-2.5">
+        {__DEMO__ ? (
+          <span className="mb-1 self-start rounded-full bg-cream-deep px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-faint">
+            demonstração
+          </span>
+        ) : null}
         <p className="text-[12px] leading-normal text-ink-dim">Tudo salvo neste aparelho.</p>
         <button
           onClick={onExport}
