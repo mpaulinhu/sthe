@@ -31,7 +31,7 @@ export function PersonRow({
   onEditar: () => void
   onToggleEntry: (entry: Entry) => void
 }) {
-  const { person, entries, total, pago, falta, quitado, atrasado } = summary
+  const { person, entries, total, pago, falta, quitado, atrasado, venceu } = summary
 
   // "Modo discreto": esconde todo valor, para ela abrir a tela na frente da equipe.
   const val = (v: number) => (discreet ? '••••' : formatMoney(v))
@@ -41,15 +41,26 @@ export function PersonRow({
   const desc = (t: string) => (discreet ? t.replace(/R\$\s?[\d.,]+/g, '••••') : t)
 
   const semLancamento = total === 0 && entries.length === 0
+  // Sem lançamento não há dívida — mas se o dia de pagar já passou, isso
+  // costuma ser esquecimento, e precisa chamar atenção em vez de parecer
+  // "a pagar" (que sugere, falsamente, que já existe um valor combinado).
+  const esquecido = semLancamento && venceu
+
   const status = semLancamento
-    ? 'sem lançamento'
+    ? esquecido
+      ? 'falta lançar'
+      : 'sem lançamento'
     : quitado
       ? 'pago'
       : atrasado
         ? 'em atraso'
         : 'a pagar'
 
-  const statusColor = quitado ? 'text-paid' : atrasado ? 'text-late' : 'text-ink-faint'
+  const statusColor = quitado
+    ? 'text-paid'
+    : atrasado || esquecido
+      ? 'text-late'
+      : 'text-ink-faint'
   const parcial = falta > 0 && pago > 0
   const progresso = total > 0 ? Math.min(100, (pago / total) * 100) : 0
 
@@ -59,7 +70,7 @@ export function PersonRow({
         <div className="w-[34px] shrink-0 text-center">
           <p
             className={`text-[16px] font-semibold leading-none tabular-nums ${
-              atrasado ? 'text-late' : 'text-ink-faint'
+              atrasado || esquecido ? 'text-late' : 'text-ink-faint'
             }`}
           >
             {String(person.payDay).padStart(2, '0')}
@@ -108,6 +119,15 @@ export function PersonRow({
               className="rounded-[10px] border border-butterfly-100 bg-butterfly-50 px-3.5 py-2 text-[13.5px] font-medium text-butterfly-500 transition-colors hover:bg-butterfly-100"
             >
               Pagar
+            </button>
+          ) : esquecido ? (
+            // A ação óbvia de quem venceu sem nada lançado é lançar o valor —
+            // deixar isso a um clique evita ter que abrir os detalhes.
+            <button
+              onClick={onLancar}
+              className="rounded-[10px] border border-cream-deep bg-white px-3.5 py-2 text-[13.5px] font-medium text-ink-soft transition-colors hover:bg-cream"
+            >
+              Lançar
             </button>
           ) : null}
           <button

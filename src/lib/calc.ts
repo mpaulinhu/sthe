@@ -13,6 +13,11 @@ export interface PersonSummary {
   quitado: boolean
   /** Tem algo pendente com data já vencida. */
   atrasado: boolean
+  /**
+   * O dia combinado de pagamento já passou. Diferente de `atrasado`, que exige
+   * dívida em aberto: serve para avisar de quem venceu e não teve nada lançado.
+   */
+  venceu: boolean
 }
 
 export interface MonthSummary {
@@ -106,6 +111,7 @@ export function summarizePerson(person: Person, allEntries: Entry[], period: str
     falta,
     quitado: total > 0 && falta === 0,
     atrasado,
+    venceu,
   }
 }
 

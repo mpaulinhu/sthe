@@ -309,3 +309,28 @@ describe('novos tipos de lançamento', () => {
     expect(s.falta).toBe(1500)
   })
 })
+
+describe('venceu x atrasado', () => {
+  it('sem lançamento e dia já passado: venceu, mas NÃO é atraso (não há dívida)', () => {
+    const s = summarizePerson(person({ payDay: 1 }), [], '2020-01')
+    expect(s.venceu).toBe(true)
+    expect(s.atrasado).toBe(false)
+    expect(s.total).toBe(0)
+  })
+
+  it('com dívida e dia já passado: venceu e é atraso', () => {
+    const s = summarizePerson(
+      person({ payDay: 1 }),
+      [{ ...entry('salario', 1000, false), period: '2020-01' }],
+      '2020-01',
+    )
+    expect(s.venceu).toBe(true)
+    expect(s.atrasado).toBe(true)
+  })
+
+  it('mês futuro não venceu', () => {
+    const s = summarizePerson(person({ payDay: 1 }), [], '2099-01')
+    expect(s.venceu).toBe(false)
+    expect(s.atrasado).toBe(false)
+  })
+})
