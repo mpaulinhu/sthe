@@ -23,8 +23,17 @@
   --color-late: #b3452f;
   --color-late-soft: #fbeae6;
 
-  --font-display: "Fraunces", Georgia, serif;
-  --font-sans: "Outfit", system-ui, -apple-system, sans-serif;
+  --font-display: "Barlow Condensed", "Barlow", system-ui, sans-serif;
+  --font-sans: "Barlow", system-ui, -apple-system, sans-serif;
+
+  /* Tons de apoio que o handoff usa e que não existiam como token */
+  --color-ink-dim: #b3bac2;
+  --color-ink-off: #a6aeb6;
+  --color-hair: #f5f2ec;
+  --color-surface-sunken: #fdfcfa;
+  --color-line: #ddd8ce;
+  --color-toast-check: #7fd4ab;
+  --color-ink-hover: #33383e;
 }
 
 html, body, #root { height: 100%; }
@@ -34,6 +43,30 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Foco visível padronizado — nunca o azul default do browser (handoff). */
+:focus-visible {
+  outline: 2px solid var(--color-butterfly-500);
+  outline-offset: 2px;
+}
+
+::selection { background: var(--color-butterfly-100); }
+
+input::placeholder,
+textarea::placeholder { color: var(--color-ink-dim); }
+
+@keyframes sheetIn {
+  from { transform: translateX(24px); opacity: .4 }
+  to { transform: none; opacity: 1 }
+}
+@keyframes fadeIn {
+  from { opacity: 0 }
+  to { opacity: 1 }
+}
+@keyframes toastIn {
+  from { transform: translate(-50%, 10px); opacity: 0 }
+  to { transform: translate(-50%, 0); opacity: 1 }
 }
 
 @media print {

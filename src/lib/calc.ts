@@ -84,8 +84,19 @@ export function summarizePerson(person: Person, allEntries: Entry[], period: str
 
   const pago = Math.max(0, pagoPorCobrancas + adiantadoQueAindaConta)
   const falta = Math.max(0, total - pago)
+
+  // "Atrasado" olha o dia combinado de pagamento da pessoa, não a data de cada
+  // lançamento: é assim que ela pensa ("a Ana recebe dia 5 e hoje é 27").
+  // Só faz sentido dentro do mês corrente — meses passados com saldo em aberto
+  // contam como atraso, e meses futuros nunca.
   const hoje = todayIso()
-  const atrasado = falta > 0 && entries.some((e) => !e.paid && e.date !== '' && e.date < hoje)
+  const mesAtual = hoje.slice(0, 7)
+  let venceu: boolean
+  if (period < mesAtual) venceu = true
+  else if (period > mesAtual) venceu = false
+  else venceu = person.payDay < Number(hoje.slice(8, 10))
+
+  const atrasado = falta > 0 && venceu
 
   return {
     person,
@@ -96,6 +107,86 @@ export function summarizePerson(person: Person, allEntries: Entry[], period: str
     quitado: total > 0 && falta === 0,
     atrasado,
   }
+}
+
+export type StatusKey = 'atraso' | 'apagar' | 'pagos'
+export type FilterKey = 'todos' | StatusKey
+export type SortKey = 'vencimento' | 'valor' | 'nome'
+
+/** Em qual dos três grupos a pessoa cai. Sem lançamento conta como "a pagar". */
+export function statusOf(s: PersonSummary): StatusKey {
+  if (s.quitado) return 'pagos'
+  if (s.atrasado) return 'atraso'
+  return 'apagar'
+}
+
+export function sortSummaries(list: PersonSummary[], sort: SortKey): PersonSummary[] {
+  const byName = (a: PersonSummary, b: PersonSummary) =>
+    a.person.name.localeCompare(b.person.name, 'pt-BR')
+
+  return [...list].sort((a, b) => {
+    if (sort === 'valor') return b.falta - a.falta || byName(a, b)
+    if (sort === 'nome') return byName(a, b)
+    return a.person.payDay - b.person.payDay || byName(a, b)
+  })
+}
+
+export interface Group {
+  key: StatusKey
+  titulo: string
+  cor: string
+  items: PersonSummary[]
+  /** Falta a pagar do grupo; no grupo "Pagos", o total já pago. */
+  soma: number
+}
+
+const GROUP_DEF: { key: StatusKey; titulo: string; cor: string }[] = [
+  { key: 'atraso', titulo: 'Em atraso', cor: '#b3452f' },
+  { key: 'apagar', titulo: 'A pagar', cor: '#b8862a' },
+  { key: 'pagos', titulo: 'Pagos', cor: '#2f7d5c' },
+]
+
+/** Grupos na ordem fixa do design, já sem os vazios. */
+export function buildGroups(visible: PersonSummary[]): Group[] {
+  return GROUP_DEF.map((g) => {
+    const items = visible.filter((s) => statusOf(s) === g.key)
+    const soma = items.reduce((acc, s) => acc + (g.key === 'pagos' ? s.pago : s.falta), 0)
+    return { ...g, items, soma }
+  }).filter((g) => g.items.length > 0)
+}
+
+export interface MonthStats extends MonthSummary {
+  atrasoTotal: number
+  atrasoCount: number
+  /** Primeira pessoa a vencer entre as que ainda não estão atrasadas. */
+  proximo: PersonSummary | null
+}
+
+export function monthStats(list: PersonSummary[]): MonthStats {
+  const base = summarizeMonth(list)
+  const atrasados = list.filter((s) => s.atrasado)
+  const aVencer = sortSummaries(
+    list.filter((s) => s.falta > 0 && !s.atrasado),
+    'vencimento',
+  )
+  return {
+    ...base,
+    atrasoTotal: atrasados.reduce((acc, s) => acc + s.falta, 0),
+    atrasoCount: atrasados.length,
+    proximo: aVencer[0] ?? null,
+  }
+}
+
+/** "27/08" — data curta usada na sublinha do lançamento. */
+export function formatShortDate(iso: string): string {
+  if (!iso) return ''
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
+}
+
+/** Abreviação do mês para a coluna do dia: "AGO". */
+export function monthAbbr(period: string): string {
+  const [y, m] = period.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
 }
 
 /**
@@ -118,9 +209,9 @@ export function buildRepeatedEntries(
     .filter(
       (e) =>
         e.period === fromPeriod &&
-        // Só o que se repete todo mês. Adiantamento e desconto são do mês em que
-        // aconteceram — repetir criaria cobrança que ela nunca combinou.
-        (e.kind === 'salario' || e.kind === 'servico') &&
+        // Só o que se repete todo mês. Vale, desconto, extra e reembolso são do
+        // mês em que aconteceram — repetir criaria cobrança que ela não combinou.
+        (e.kind === 'salario' || e.kind === 'servico' || e.kind === 'diaria') &&
         ativos.has(e.personId) &&
         // Quem já tem qualquer lançamento no mês novo fica de fora, para não duplicar.
         !jaTem.has(e.personId),

@@ -1,16 +1,31 @@
-import type { Database } from './types'
+import type { Database, Entry, Person } from './types'
 
 const KEY = 'sthe.pagamentos.v1'
 
-const EMPTY: Database = { version: 1, people: [], entries: [] }
+const EMPTY: Database = { version: 2, people: [], entries: [] }
+
+/**
+ * v1 → v2: `adiantamento` virou `vale` (mesmo efeito: antecipa parte do total).
+ * Bancos gravados antes dessa mudança ainda trazem o nome antigo; sem a
+ * conversão o lançamento cairia num tipo inexistente e sumiria da conta.
+ */
+function migrate(raw: unknown): Database {
+  const db = raw as { people?: Person[]; entries?: (Omit<Entry, 'kind'> & { kind: string })[] }
+  if (!db || !Array.isArray(db.people) || !Array.isArray(db.entries)) return EMPTY
+
+  const entries = db.entries.map((e) => {
+    const kind = e.kind === 'adiantamento' ? 'vale' : e.kind
+    return { ...e, kind } as Entry
+  })
+
+  return { version: 2, people: db.people, entries }
+}
 
 export function loadDb(): Database {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return EMPTY
-    const parsed = JSON.parse(raw) as Database
-    if (!parsed || !Array.isArray(parsed.people) || !Array.isArray(parsed.entries)) return EMPTY
-    return { version: 1, people: parsed.people, entries: parsed.entries }
+    return migrate(JSON.parse(raw))
   } catch {
     return EMPTY
   }
@@ -35,11 +50,11 @@ export function exportDb(db: Database): void {
 }
 
 export function parseImportedDb(text: string): Database {
-  const parsed = JSON.parse(text) as Database
+  const parsed = JSON.parse(text)
   if (!parsed || !Array.isArray(parsed.people) || !Array.isArray(parsed.entries)) {
     throw new Error('Arquivo fora do formato esperado.')
   }
-  return { version: 1, people: parsed.people, entries: parsed.entries }
+  return migrate(parsed)
 }
 
 export function uid(): string {

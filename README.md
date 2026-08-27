@@ -35,24 +35,31 @@ referência e o dia em que costuma ser paga). Depois, mês a mês, você adicion
 | Tipo | O que faz na conta do mês |
 |---|---|
 | **Salário** | Soma. É o pagamento principal. |
-| **Serviço avulso** | Soma. Usado para freelancer e diária. |
-| **Extra / Bônus** | Soma **por fora** do salário (gorjeta, ajuda de custo). |
-| **Adiantamento** | **Não muda o total.** É parte do salário paga antes da data — abate do que ainda falta pagar. |
+| **Diária** | Soma. Dias trabalhados no período. |
+| **Serviço** | Soma. Trabalho avulso, freelancer. |
+| **Hora extra** | Soma **por fora** do combinado. |
+| **Reembolso** | Soma. Despesa que ela adiantou e você devolve. |
+| **Vale** | **Não muda o total.** É parte paga antes da data — abate do que ainda falta pagar. |
 | **Desconto** | Abate do total (falta, material quebrado, etc.). |
 
-A diferença entre **Adiantamento** e **Extra** é importante:
+A diferença entre **Vale** e **Hora extra** é importante:
 
-- Salário R$ 2.000 + adiantamento de R$ 500 → total continua **R$ 2.000**, e
-  falta pagar **R$ 1.500**.
-- Salário R$ 2.000 + extra de R$ 500 → total vira **R$ 2.500**.
+- Salário R$ 2.000 + vale de R$ 500 → total continua **R$ 2.000**, e falta
+  pagar **R$ 1.500**.
+- Salário R$ 2.000 + hora extra de R$ 500 → total vira **R$ 2.500**.
 
 ### Status de cada pessoa
 
-- **Pago** — não falta mais nada no mês.
-- **A pagar** — ainda tem valor em aberto.
-- **Atrasado** — tem lançamento pendente com data já vencida.
+As pessoas ficam agrupadas em três blocos, nesta ordem:
 
-O botão **Quitar** marca de uma vez tudo que está pendente daquela pessoa no mês.
+- **Em atraso** — o dia de pagar já passou e ainda falta valor.
+- **A pagar** — ainda tem valor em aberto, dentro do prazo.
+- **Pagos** — não falta mais nada no mês.
+
+O botão **Pagar** abre o painel lateral com o valor que falta já preenchido. Se
+você confirmar o valor cheio, tudo que estava pendente é quitado de uma vez. Se
+confirmar um valor menor, entra um **vale** já pago — e a barra de progresso
+mostra o quanto já saiu.
 
 ## Coisas que facilitam o dia a dia
 
@@ -63,7 +70,9 @@ O botão **Quitar** marca de uma vez tudo que está pendente daquela pessoa no m
   aparece um atalho para trazer os pagamentos do mês passado, todos como "não
   pagos" — assim não precisa redigitar o salário de todo mundo. Adiantamentos e
   descontos **não** são repetidos, porque são pontuais daquele mês.
-- **Resumo dos meses.** No menu (⋮), mostra os últimos 6 meses e a média gasta.
+- **Modo discreto.** O olho no topo troca todo valor por `••••`, para abrir a
+  tela na frente da equipe sem expor salário de ninguém.
+- **Ordenação.** Por vencimento (padrão), maior valor ou nome.
 - **Tirar alguém da lista.** Ao editar a pessoa, em "Não trabalha mais aqui". O
   histórico dos meses anteriores continua salvo.
 
@@ -72,11 +81,9 @@ O botão **Quitar** marca de uma vez tudo que está pendente daquela pessoa no m
 Tudo é salvo **no navegador do próprio computador** (localStorage) — não vai para
 nenhum servidor e não precisa de internet nem de login.
 
-Isso significa que **limpar os dados do navegador apaga tudo**. Por isso, no menu
-(⋮) do canto superior direito existem:
-
-- **Baixar meus dados** — salva um arquivo `.json` com tudo.
-- **Restaurar backup** — recarrega um arquivo desses (substitui o que estiver lá).
+Isso significa que **limpar os dados do navegador apaga tudo**. Por isso existe
+**Baixar backup**, no rodapé da barra lateral — salva um arquivo `.json` com
+tudo, e o mesmo arquivo pode ser recarregado depois para restaurar.
 
 Vale baixar uma cópia de vez em quando e guardar em algum lugar seguro.
 
@@ -105,18 +112,27 @@ gh auth login             # se não estiver
 ```
 src/
   lib/
-    types.ts       # modelo de dados (pessoas, lançamentos)
-    calc.ts        # regras do mês + repetir lançamentos do mês anterior
-    calc.test.ts   # testes das regras
+    types.ts       # modelo de dados (pessoas, lançamentos, tipos de valor)
+    calc.ts        # regras do mês, agrupamento, ordenação, repetir mês
     money.ts       # formatação de dinheiro ao digitar
-    money.test.ts  # testes da formatação
-    storage.ts     # salvar/carregar/exportar
-  components/      # cards, formulários, primitivos de UI
-  App.tsx          # a tela
+    storage.ts     # salvar/carregar/exportar + migração de versão
+    *.test.ts      # testes de cálculo, formatação e migração
+  components/
+    Sidebar.tsx    # nav lateral (+ as janelas futuras do produto)
+    PersonRow.tsx  # a linha de cada pessoa, com os detalhes expansíveis
+    Sheet.tsx      # painel lateral (base) + campos e segmented
+    ValueSheet.tsx # modos "registrar pagamento" e "lançar valor"
+    PersonSheet.tsx# cadastro/edição de pessoa
+    MoneyInput.tsx # campo com máscara ao vivo
+    Toast.tsx      # confirmação que some em 2,6 s
+  App.tsx          # a tela: header, resumo, filtros e grupos
 ```
 
-A lógica de dinheiro fica isolada em `calc.ts` e é coberta por testes — mexer ali
-sem rodar `npm run test` é pedir para quebrar a conta.
+O design vem do handoff em `Refatorações/design_handoff_pagamentos/` — cores,
+tipografia (Barlow / Barlow Condensed) e espaçamentos seguem aquele documento.
+
+A lógica de dinheiro fica isolada em `calc.ts` / `money.ts` e é coberta por
+testes — mexer ali sem rodar `npm run test` é pedir para quebrar a conta.
 
 ## Paleta
 

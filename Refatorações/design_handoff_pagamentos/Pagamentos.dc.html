@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&amp;family=Barlow+Condensed:wght@500;600&amp;display=swap">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #faf8f4; }
+  body { -webkit-font-smoothing: antialiased; }
+  a { color: #2c6fb5; text-decoration: none; }
+  a:hover { color: #1b4f8a; text-decoration: underline; }
+  ::selection { background: #d7e7f7; }
+  input, textarea, select, button { font: inherit; color: inherit; }
+  input::placeholder, textarea::placeholder { color: #b3bac2; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid #2c6fb5; outline-offset: 2px; }
+  @keyframes sheetIn { from { transform: translateX(24px); opacity: .4 } to { transform: none; opacity: 1 } }
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes toastIn { from { transform: translateY(10px); opacity: 0 } to { transform: none; opacity: 1 } }
+</style>
+</helmet>
+
+<div style="display: flex; align-items: stretch; min-height: 100vh; background: #faf8f4; font-family: Barlow, system-ui, sans-serif; color: #1a1d21; font-size: 15px">
+
+  <aside style="width: 236px; flex-shrink: 0; border-right: 1px solid #f2eee6; padding: 22px 14px 20px; display: flex; flex-direction: column; gap: 26px; position: sticky; top: 0; align-self: flex-start; height: 100vh">
+    <div style="display: flex; align-items: center; gap: 9px; padding: 0 8px">
+      <svg viewBox="0 0 48 48" style="width: 24px; height: 24px; display: block" fill="none" aria-hidden="true">
+        <path d="M24 30c-2.5 5-7.5 9-13 9-4 0-7-2.5-7-6.5 0-6 5-10.5 11-13.5C20 17 23 15 24 12c1 3 4 5 9 7 6 3 11 7.5 11 13.5 0 4-3 6.5-7 6.5-5.5 0-10.5-4-13-9Z" fill="#2c6fb5"></path>
+        <path d="M24 12v22" stroke="#133a66" stroke-width="1.6" stroke-linecap="round"></path>
+        <path d="M23 12c-1-3-3-5-5.5-6M25 12c1-3 3-5 5.5-6" stroke="#133a66" stroke-width="1.6" stroke-linecap="round"></path>
+      </svg>
+      <span style="font-family: 'Barlow Condensed', Barlow, sans-serif; font-size: 20px; letter-spacing: 0.14em; font-weight: 600">STHE</span>
+    </div>
+
+    <nav style="display: flex; flex-direction: column; gap: 2px">
+      <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; background: #f2eee6; color: #1a1d21; font-weight: 500; font-size: 14px; text-decoration: none">
+        <svg viewBox="0 0 18 18" style="width: 16px; height: 16px" fill="none" stroke="#2c6fb5" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 6.5h13M2.5 6.5v7a1.5 1.5 0 001.5 1.5h10a1.5 1.5 0 001.5-1.5v-7M2.5 6.5l1.2-3a1.5 1.5 0 011.4-1h7.8a1.5 1.5 0 011.4 1l1.2 3"></path><path d="M7 10h4"></path></svg>
+        Pagamentos
+      </a>
+      <div style="padding: 16px 10px 6px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #b3bac2">Em breve</div>
+      <span style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; color: #a6aeb6; font-size: 14px">
+        <svg viewBox="0 0 18 18" style="width: 16px; height: 16px" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2.5" y="3.5" width="13" height="12" rx="2"></rect><path d="M2.5 7.5h13M6 2.5v2M12 2.5v2"></path></svg>
+        Agenda
+      </span>
+      <span style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; color: #a6aeb6; font-size: 14px">
+        <svg viewBox="0 0 18 18" style="width: 16px; height: 16px" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 6L9 2.5 15.5 6v6L9 15.5 2.5 12V6Z"></path><path d="M2.5 6L9 9.5 15.5 6M9 9.5v6"></path></svg>
+        Estoque
+      </span>
+      <span style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; color: #a6aeb6; font-size: 14px">
+        <svg viewBox="0 0 18 18" style="width: 16px; height: 16px" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 15.5h13"></path><path d="M5 15.5V9M9 15.5V4M13 15.5v-4"></path></svg>
+        Vendas
+      </span>
+      <span style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; color: #a6aeb6; font-size: 14px">
+        <svg viewBox="0 0 18 18" style="width: 16px; height: 16px" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 2.5h7l3 3v10a1 1 0 01-1 1H4a1 1 0 01-1-1v-12a1 1 0 011-1Z"></path><path d="M6 9h6M6 12h4"></path></svg>
+        Relatórios
+      </span>
+    </nav>
+
+    <div style="margin-top: auto; padding: 0 10px; display: flex; flex-direction: column; gap: 6px">
+      <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #b3bac2">Tudo salvo neste aparelho.</p>
+      <a href="#" style="font-size: 12.5px; color: #4a5159">Baixar backup</a>
+    </div>
+  </aside>
+
+  <main style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+
+    <header style="position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 14px; padding: 14px 32px; border-bottom: 1px solid #f2eee6; background: rgba(250,248,244,0.88); backdrop-filter: blur(10px)">
+      <div style="display: flex; align-items: center; gap: 4px">
+        <button onClick="{{ mesAnterior }}" aria-label="Mês anterior" style="display: flex; padding: 6px; border: 0; border-radius: 9px; background: transparent; color: #8b939c" style-hover="background: #f2eee6; color: #1a1d21">
+          <svg viewBox="0 0 16 16" style="width: 16px; height: 16px" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L5 8l5 5"></path></svg>
+        </button>
+        <h1 style="margin: 0; font-family: 'Barlow Condensed', Barlow, sans-serif; font-size: 23px; font-weight: 600; letter-spacing: 0.01em; min-width: 172px; text-align: center">{{ mesLabel }}</h1>
+        <button onClick="{{ mesSeguinte }}" aria-label="Próximo mês" style="display: flex; padding: 6px; border: 0; border-radius: 9px; background: transparent; color: #8b939c" style-hover="background: #f2eee6; color: #1a1d21">
+          <svg viewBox="0 0 16 16" style="width: 16px; height: 16px" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l5 5-5 5"></path></svg>
+        </button>
+      </div>
+
+      <sc-if value="{{ foraDoMesAtual }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ voltarHoje }}" style="padding: 5px 10px; border: 0; border-radius: 8px; background: transparent; color: #2c6fb5; font-size: 12.5px; font-weight: 500" style-hover="background: #eef5fc">voltar para hoje</button>
+      </sc-if>
+
+      <div style="margin-left: auto; display: flex; align-items: center; gap: 10px">
+        <button onClick="{{ abrirPessoa }}" style="display: flex; align-items: center; gap: 7px; padding: 9px 15px; border: 0; border-radius: 11px; background: #1a1d21; color: #faf8f4; font-size: 14px; font-weight: 500" style-hover="background: #33383e">
+          <svg viewBox="0 0 16 16" style="width: 14px; height: 14px" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"></path></svg>
+          Nova pessoa
+        </button>
+      </div>
+    </header>
+
+    <div style="padding: 34px 32px 64px; max-width: 1040px; width: 100%">
+
+      <section style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 40px; padding-bottom: 26px; border-bottom: 1px solid #f2eee6">
+        <div style="min-width: 260px">
+          <p style="margin: 0 0 6px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #8b939c">Falta pagar</p>
+          <p style="margin: 0; font-family: Barlow, system-ui, sans-serif; font-size: 44px; line-height: 1; font-weight: 600; letter-spacing: -0.025em; font-variant-numeric: tabular-nums">{{ faltaTotal }}</p>
+          <div style="margin-top: 16px; width: 300px; max-width: 100%; height: 5px; border-radius: 99px; background: #f2eee6; overflow: hidden">
+            <div style="height: 100%; border-radius: 99px; transition: width .5s ease; width: {{ progressoMes }}; background: {{ accent }}"></div>
+          </div>
+          <p style="margin: 9px 0 0; font-size: 13px; color: #8b939c">{{ pagoTotal }} já pago de {{ totalMes }}</p>
+        </div>
+
+        <div style="display: flex; gap: 34px; padding-bottom: 4px">
+          <div>
+            <p style="margin: 0 0 6px; display: flex; align-items: center; gap: 6px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #b3452f">
+              <span style="width: 6px; height: 6px; border-radius: 99px; background: #b3452f"></span>
+              Em atraso
+            </p>
+            <p style="margin: 0; font-family: Barlow, system-ui, sans-serif; font-size: 21px; line-height: 1.2; font-weight: 600; letter-spacing: -0.015em; color: #b3452f; font-variant-numeric: tabular-nums">{{ atrasoTotal }}</p>
+            <p style="margin: 4px 0 0; font-size: 13px; color: #8b939c">{{ atrasoLabel }}</p>
+          </div>
+          <div>
+            <p style="margin: 0 0 6px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #8b939c">Próximo</p>
+            <p style="margin: 0; font-family: Barlow, system-ui, sans-serif; font-size: 21px; line-height: 1.2; font-weight: 600; letter-spacing: -0.015em; font-variant-numeric: tabular-nums">{{ proximoValor }}</p>
+            <p style="margin: 4px 0 0; font-size: 13px; color: #8b939c">{{ proximoLabel }}</p>
+          </div>
+        </div>
+      </section>
+
+      <div style="display: flex; align-items: center; gap: 6px; padding: 20px 0 14px">
+        <sc-for list="{{ filtros }}" as="f" hint-placeholder-count="4">
+          <button onClick="{{ f.onClick }}" style="padding: 7px 13px; border: 0; border-radius: 9px; font-size: 13.5px; font-weight: 500; background: {{ f.bg }}; color: {{ f.fg }}">{{ f.label }}</button>
+        </sc-for>
+      </div>
+
+      <sc-for list="{{ grupos }}" as="g" hint-placeholder-count="2">
+        <section style="margin-bottom: 30px">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 0 2px 10px">
+            <span style="width: 6px; height: 6px; border-radius: 99px; background: {{ g.cor }}"></span>
+            <h2 style="margin: 0; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #4a5159; font-weight: 500">{{ g.titulo }}</h2>
+            <span style="font-size: 12px; color: #b3bac2">{{ g.count }}</span>
+            <span style="flex: 1; height: 1px; background: #f2eee6"></span>
+            <span style="font-size: 13px; color: #8b939c; font-variant-numeric: tabular-nums">{{ g.soma }}</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <sc-for list="{{ g.items }}" as="p" hint-placeholder-count="3">
+              <article style="border: 1px solid #f2eee6; border-radius: 16px; background: #ffffff; box-shadow: 0 1px 2px rgba(26,29,33,0.03)">
+                <div style="display: flex; align-items: center; gap: 14px; padding: 15px 18px">
+                  <div style="width: 34px; flex-shrink: 0; text-align: center">
+                    <p style="margin: 0; font-family: Barlow, system-ui, sans-serif; font-size: 16px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; color: {{ p.diaCor }}">{{ p.dia }}</p>
+                    <p style="margin: 2px 0 0; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #b3bac2">ago</p>
+                  </div>
+
+                  <span style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; flex-shrink: 0; border-radius: 99px; font-size: 12.5px; font-weight: 600; background: {{ p.avatarBg }}; color: {{ p.avatarFg }}">{{ p.iniciais }}</span>
+
+                  <div style="min-width: 0; flex: 1">
+                    <h3 style="margin: 0; font-family: 'Barlow Condensed', Barlow, sans-serif; font-size: 18.5px; font-weight: 600; letter-spacing: 0.005em; line-height: 1.25">{{ p.nome }}</h3>
+                    <p style="margin: 2px 0 0; font-size: 13px; color: #8b939c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ p.meta }}</p>
+                  </div>
+
+                  <div style="flex-shrink: 0; text-align: right; min-width: 118px">
+                    <p style="margin: 0; font-family: Barlow, system-ui, sans-serif; font-size: 18px; line-height: 1.2; font-weight: 600; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; color: {{ p.valorCor }}">{{ p.valor }}</p>
+                    <p style="margin: 3px 0 0; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: {{ p.statusCor }}">{{ p.status }}</p>
+                  </div>
+
+                  <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0">
+                    <sc-if value="{{ p.podePagar }}" hint-placeholder-val="{{ true }}">
+                      <button onClick="{{ p.onPagar }}" style="padding: 8px 14px; border-radius: 10px; border: 1px solid #d7e7f7; background: #eef5fc; font-size: 13.5px; font-weight: 500; color: {{ accent }}" style-hover="background: #d7e7f7">Pagar</button>
+                    </sc-if>
+                    <button onClick="{{ p.onToggle }}" aria-label="Detalhes" style="display: flex; padding: 8px; border: 0; border-radius: 9px; background: transparent; color: #b3bac2" style-hover="background: #f2eee6; color: #4a5159">
+                      <svg viewBox="0 0 16 16" style="width: 15px; height: 15px; transition: transform .2s ease; transform: rotate({{ p.chevron }})" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6L8 10.5 12.5 6"></path></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <sc-if value="{{ p.temParcial }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding: 0 18px 15px">
+                    <div style="height: 4px; border-radius: 99px; background: #f2eee6; overflow: hidden">
+                      <div style="height: 100%; border-radius: 99px; width: {{ p.progresso }}; background: {{ accent }}"></div>
+                    </div>
+                    <p style="margin: 7px 0 0; font-size: 12px; color: #8b939c">já pago {{ p.pago }} de {{ p.total }}</p>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ p.aberto }}" hint-placeholder-val="{{ false }}">
+                  <div style="border-top: 1px solid #f5f2ec; background: #fdfcfa; border-radius: 0 0 15px 15px">
+                    <div style="display: flex; flex-direction: column">
+                      <sc-for list="{{ p.lancamentos }}" as="l" hint-placeholder-count="2">
+                        <div style="display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid #f5f2ec">
+                          <button onClick="{{ l.onToggle }}" aria-label="{{ l.ariaLabel }}" style="display: flex; align-items: center; justify-content: center; width: 19px; height: 19px; flex-shrink: 0; border-radius: 6px; border: 1px solid {{ l.boxBorda }}; background: {{ l.boxBg }}; color: #ffffff; padding: 0">
+                            <svg viewBox="0 0 14 14" style="width: 10px; height: 10px; opacity: {{ l.checkOpacidade }}" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5l3 3 6-6.5"></path></svg>
+                          </button>
+                          <div style="min-width: 0; flex: 1">
+                            <p style="margin: 0; font-size: 13.5px">{{ l.titulo }}</p>
+                            <p style="margin: 2px 0 0; font-size: 11.5px; color: #b3bac2">{{ l.sub }}</p>
+                          </div>
+                          <span style="font-size: 13.5px; font-weight: 500; font-variant-numeric: tabular-nums; color: {{ l.cor }}">{{ l.valor }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 4px; padding: 10px 14px">
+                      <button onClick="{{ p.onLancar }}" style="padding: 7px 11px; border: 0; border-radius: 9px; background: transparent; color: #4a5159; font-size: 13px; font-weight: 500" style-hover="background: #f2eee6">Lançar valor</button>
+                      <button onClick="{{ p.onEditar }}" style="padding: 7px 11px; border: 0; border-radius: 9px; background: transparent; color: #8b939c; font-size: 13px" style-hover="background: #f2eee6; color: #4a5159">Editar pessoa</button>
+                      <sc-if value="{{ p.temNota }}" hint-placeholder-val="{{ false }}">
+                        <span style="margin-left: auto; font-size: 12.5px; color: #b3bac2; padding-right: 6px">{{ p.nota }}</span>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-if>
+              </article>
+            </sc-for>
+          </div>
+        </section>
+      </sc-for>
+
+      <sc-if value="{{ listaVazia }}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 70px 20px; text-align: center">
+          <svg viewBox="0 0 48 48" style="width: 34px; height: 34px; opacity: .25" fill="none" aria-hidden="true">
+            <path d="M24 30c-2.5 5-7.5 9-13 9-4 0-7-2.5-7-6.5 0-6 5-10.5 11-13.5C20 17 23 15 24 12c1 3 4 5 9 7 6 3 11 7.5 11 13.5 0 4-3 6.5-7 6.5-5.5 0-10.5-4-13-9Z" fill="#2c6fb5"></path>
+          </svg>
+          <h3 style="margin: 4px 0 0; font-family: 'Barlow Condensed', Barlow, sans-serif; font-size: 19px; font-weight: 600">{{ vazioTitulo }}</h3>
+          <p style="margin: 0; max-width: 320px; font-size: 13.5px; line-height: 1.6; color: #8b939c">{{ vazioTexto }}</p>
+        </div>
+      </sc-if>
+    </div>
+  </main>
+
+  <sc-if value="{{ sheetAberto }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; z-index: 40; display: flex; justify-content: flex-end">
+      <div onClick="{{ fecharSheet }}" style="position: absolute; inset: 0; background: rgba(26,29,33,0.28); animation: fadeIn .18s ease"></div>
+      <div style="position: relative; width: 428px; max-width: 100%; height: 100%; display: flex; flex-direction: column; background: #ffffff; box-shadow: -24px 0 60px -30px rgba(26,29,33,0.4); animation: sheetIn .22s cubic-bezier(.2,.7,.3,1)">
+
+        <div style="display: flex; align-items: flex-start; gap: 12px; padding: 22px 24px 18px; border-bottom: 1px solid #f2eee6">
+          <div style="flex: 1; min-width: 0">
+            <h2 style="margin: 0; font-family: 'Barlow Condensed', Barlow, sans-serif; font-size: 22px; font-weight: 600; letter-spacing: 0.01em">{{ sheetTitulo }}</h2>
+            <p style="margin: 4px 0 0; font-size: 13px; color: #8b939c">{{ sheetSub }}</p>
+          </div>
+          <button onClick="{{ fecharSheet }}" aria-label="Fechar" style="display: flex; padding: 7px; border: 0; border-radius: 9px; background: transparent; color: #8b939c" style-hover="background: #f2eee6; color: #1a1d21">
+            <svg viewBox="0 0 16 16" style="width: 15px; height: 15px" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"></path></svg>
+          </button>
+        </div>
+
+        <div style="flex: 1; overflow-y: auto; padding: 22px 24px 26px; display: flex; flex-direction: column; gap: 20px">
+
+          <sc-if value="{{ modoPessoa }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 20px">
+              <label style="display: flex; flex-direction: column; gap: 7px">
+                <span style="font-size: 13.5px; font-weight: 500">Nome</span>
+                <input value="{{ pessoaNome }}" onChange="{{ onPessoaNome }}" placeholder="ex: Ana Paula Ribeiro" style="width: 100%; padding: 11px 13px; border: 1px solid #f2eee6; border-radius: 11px; background: #faf8f4; font-size: 14.5px; outline: none" style-focus="border-color: #aecfef; background: #ffffff">
+              </label>
+              <label style="display: flex; flex-direction: column; gap: 7px">
+                <span style="font-size: 13.5px; font-weight: 500">Função</span>
+                <input value="{{ pessoaFuncao }}" onChange="{{ onPessoaFuncao }}" placeholder="ex: Atendimento" style="width: 100%; padding: 11px 13px; border: 1px solid #f2eee6; border-radius: 11px; background: #faf8f4; font-size: 14.5px; outline: none" style-focus="border-color: #aecfef; background: #ffffff">
+              </label>
+              <div style="display: flex; flex-direction: column; gap: 8px">
+                <span style="font-size: 13.5px; font-weight: 500">Como ela recebe</span>
+                <div style="display: flex; gap: 6px; padding: 4px; background: #faf8f4; border: 1px solid #f2eee6; border-radius: 12px">
+                  <sc-for list="{{ contratos }}" as="c" hint-placeholder-count="3">
+                    <button onClick="{{ c.onClick }}" style="flex: 1; padding: 9px 6px; border: 0; border-radius: 9px; font-size: 13px; font-weight: 500; background: {{ c.bg }}; color: {{ c.fg }}">{{ c.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display: flex; gap: 12px">
+                <label style="flex: 1; display: flex; flex-direction: column; gap: 7px">
+                  <span style="font-size: 13.5px; font-weight: 500">{{ labelValorBase }}</span>
+                  <div style="display: flex; align-items: center; gap: 8px; padding: 11px 13px; border: 1px solid #f2eee6; border-radius: 11px; background: #faf8f4">
+                    <span style="font-size: 13.5px; color: #8b939c">R$</span>
+                    <input value="{{ pessoaValorTexto }}" onChange="{{ onPessoaValor }}" inputMode="numeric" placeholder="0,00" style="flex: 1; min-width: 0; border: 0; background: transparent; font-size: 15px; font-variant-numeric: tabular-nums; outline: none">
+                  </div>
+                </label>
+                <label style="width: 120px; display: flex; flex-direction: column; gap: 7px">
+                  <span style="font-size: 13.5px; font-weight: 500">Dia de pagar</span>
+                  <input value="{{ pessoaDia }}" onChange="{{ onPessoaDia }}" inputMode="numeric" placeholder="05" style="width: 100%; padding: 11px 13px; border: 1px solid #f2eee6; border-radius: 11px; background: #faf8f4; font-size: 15px; font-variant-numeric: tabular-nums; outline: none">
+                </label>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ modoValor }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 20px">
+              <sc-if value="{{ modoLancar }}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; gap: 8px">
+                  <span style="font-size: 13.5px; font-weight: 500">Tipo de lançamento</span>
+                  <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                    <sc-for list="{{ tipos }}" as="t" hint-placeholder-count="6">
+                      <button onClick="{{ t.onClick }}" style="padding: 8px 12px; border-radius: 99px; border: 1px solid {{ t.borda }}; background: {{ t.bg }}; color: {{ t.fg }}; font-size: 13px; font-weight: 500">{{ t.label }}</button>
+                    </sc-for>
+                  </div>
+                  <p style="margin: 2px 0 0; font-size: 12.5px; line-height: 1.5; color: #b3bac2">{{ tipoHint }}</p>
+                </div>
+              </sc-if>
+
+              <div style="display: flex; flex-direction: column; gap: 8px">
+                <span style="font-size: 13.5px; font-weight: 500">{{ labelValor }}</span>
+                <div style="display: flex; align-items: baseline; gap: 10px; padding: 16px 18px; border: 1px solid #f2eee6; border-radius: 14px; background: #faf8f4">
+                  <span style="font-family: Barlow, system-ui, sans-serif; font-size: 19px; font-weight: 500; color: #8b939c">R$</span>
+                  <input value="{{ valorTexto }}" onChange="{{ onValor }}" inputMode="numeric" placeholder="0,00" autoFocus="{{ true }}" style="flex: 1; min-width: 0; border: 0; background: transparent; font-family: Barlow, system-ui, sans-serif; font-size: 30px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; outline: none">
+                </div>
+                <sc-if value="{{ mostrarAtalhos }}" hint-placeholder-val="{{ false }}">
+                  <div style="display: flex; gap: 6px">
+                    <sc-for list="{{ atalhos }}" as="a" hint-placeholder-count="2">
+                      <button onClick="{{ a.onClick }}" style="padding: 7px 11px; border: 1px solid #f2eee6; border-radius: 9px; background: #ffffff; font-size: 12.5px; color: #4a5159" style-hover="background: #faf8f4">{{ a.label }}</button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 8px">
+                <span style="font-size: 13.5px; font-weight: 500">Como pagou</span>
+                <div style="display: flex; gap: 6px; padding: 4px; background: #faf8f4; border: 1px solid #f2eee6; border-radius: 12px">
+                  <sc-for list="{{ formas }}" as="m" hint-placeholder-count="4">
+                    <button onClick="{{ m.onClick }}" style="flex: 1; padding: 9px 4px; border: 0; border-radius: 9px; font-size: 12.5px; font-weight: 500; background: {{ m.bg }}; color: {{ m.fg }}">{{ m.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+
+              <label style="display: flex; flex-direction: column; gap: 7px">
+                <span style="font-size: 13.5px; font-weight: 500">Data</span>
+                <input type="date" value="{{ dataValor }}" onChange="{{ onData }}" style="width: 100%; padding: 11px 13px; border: 1px solid #f2eee6; border-radius: 11px; background: #faf8f4; font-size: 14.5px; outline: none" style-focus="border-color: #aecfef; background: #ffffff">
+              </label>
+
+              <div style="display: flex; flex-direction: column; gap: 8px">
+                <span style="font-size: 13.5px; font-weight: 500">Comprovante <span style="color: #b3bac2; font-weight: 400">· opcional</span></span>
+                <label style="display: flex; align-items: center; gap: 10px; padding: 13px; border: 1px dashed #ddd8ce; border-radius: 12px; background: #faf8f4; cursor: pointer; font-size: 13.5px; color: #4a5159" style-hover="border-color: #aecfef; background: #eef5fc">
+                  <svg viewBox="0 0 18 18" style="width: 16px; height: 16px; flex-shrink: 0" fill="none" stroke="#8b939c" stroke-width="1.5" stroke-linecap="round"><path d="M9 12.5V4M9 4L5.5 7.5M9 4l3.5 3.5"></path><path d="M3 12.5v1.5a1 1 0 001 1h10a1 1 0 001-1v-1.5"></path></svg>
+                  <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ comprovanteLabel }}</span>
+                  <input type="file" onChange="{{ onComprovante }}" style="display: none">
+                </label>
+              </div>
+
+              <label style="display: flex; flex-direction: column; gap: 7px">
+                <span style="font-size: 13.5px; font-weight: 500">Observação <span style="color: #b3bac2; font-weight: 400">· opcional</span></span>
+                <textarea value="{{ obs }}" onChange="{{ onObs }}" rows="2" placeholder="ex: 3 diárias da semana passada" style="width: 100%; padding: 11px 13px; border: 1px solid #f2eee6; border-radius: 11px; background: #faf8f4; font-size: 14px; line-height: 1.5; resize: none; outline: none" style-focus="border-color: #aecfef; background: #ffffff"></textarea>
+              </label>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px; padding: 16px 24px; border-top: 1px solid #f2eee6; background: #fdfcfa">
+          <button onClick="{{ fecharSheet }}" style="padding: 11px 15px; border: 1px solid #f2eee6; border-radius: 11px; background: #ffffff; font-size: 14px; color: #4a5159" style-hover="background: #faf8f4">Cancelar</button>
+          <button onClick="{{ confirmar }}" style="flex: 1; padding: 12px 16px; border: 0; border-radius: 11px; background: #1a1d21; color: #faf8f4; font-size: 14.5px; font-weight: 500" style-hover="background: #33383e">{{ confirmarLabel }}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ temToast }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; z-index: 60; left: 50%; bottom: 28px; transform: translateX(-50%); display: flex; align-items: center; gap: 9px; padding: 11px 17px; border-radius: 99px; background: #1a1d21; color: #faf8f4; font-size: 13.5px; box-shadow: 0 12px 30px -12px rgba(26,29,33,0.5); animation: toastIn .2s ease">
+      <svg viewBox="0 0 14 14" style="width: 13px; height: 13px; color: #7fd4ab" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5l3 3 6-6.5"></path></svg>
+      {{ toast }}
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;accentColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#2c6fb5&quot;,&quot;options&quot;:[&quot;#2c6fb5&quot;,&quot;#1b4f8a&quot;,&quot;#2f7d5c&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Aparência&quot;},&quot;modoDiscreto&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Aparência&quot;},&quot;ordenacao&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Por vencimento&quot;,&quot;options&quot;:[&quot;Por vencimento&quot;,&quot;Por maior valor&quot;,&quot;Por nome&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Lista&quot;}}">
+const HOJE = '2026-08-27';
+const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+
+const KINDS = {
+  salario: { label: 'Salário', efeito: 'soma', hint: 'O pagamento principal do mês.' },
+  diaria: { label: 'Diária', efeito: 'soma', hint: 'Dias trabalhados no período.' },
+  servico: { label: 'Serviço', efeito: 'soma', hint: 'Trabalho avulso, freelancer.' },
+  extra: { label: 'Hora extra', efeito: 'soma', hint: 'Horas ou plantão a mais, por fora do combinado.' },
+  reembolso: { label: 'Reembolso', efeito: 'soma', hint: 'Despesa que ela adiantou e você devolve.' },
+  vale: { label: 'Vale', efeito: 'antecipa', hint: 'Parte paga antes da data. Abate do que falta.' },
+  desconto: { label: 'Desconto', efeito: 'abate', hint: 'Falta, material, adiantamento anterior. Reduz o total.' },
+};
+
+const FORMAS = ['Pix', 'Dinheiro', 'Transferência', 'Cartão'];
+const CONTRATOS = [
+  { id: 'fixo', label: 'Fixo' },
+  { id: 'diarista', label: 'Diária' },
+  { id: 'freelancer', label: 'Freela' },
+];
+const CONTRATO_LABEL = { fixo: 'Salário fixo', diarista: 'Diária', freelancer: 'Freelancer' };
+
+const PESSOAS = [
+  { id: 'p1', nome: 'Ana Paula Ribeiro', funcao: 'Atendimento', contrato: 'fixo', dia: 5, nota: 'combinado: vale todo dia 12', lanc: [
+    { id: 'a1', kind: 'salario', valor: 250000, pago: false, data: '2026-08-05' },
+    { id: 'a2', kind: 'vale', valor: 80000, pago: true, data: '2026-08-12', forma: 'Pix' },
+  ] },
+  { id: 'p2', nome: 'Fernanda Alves', funcao: 'Financeiro', contrato: 'fixo', dia: 5, lanc: [
+    { id: 'b1', kind: 'salario', valor: 350000, pago: false, data: '2026-08-05' },
+  ] },
+  { id: 'p3', nome: 'Helena Dias', funcao: 'Limpeza', contrato: 'diarista', dia: 10, lanc: [
+    { id: 'c1', kind: 'diaria', valor: 117000, pago: false, data: '2026-08-10', desc: '9 diárias × R$ 130,00' },
+  ] },
+  { id: 'p4', nome: 'Eduardo Lima', funcao: 'Entregas', contrato: 'diarista', dia: 15, lanc: [
+    { id: 'd1', kind: 'diaria', valor: 110000, pago: false, data: '2026-08-15', desc: '11 diárias' },
+    { id: 'd2', kind: 'vale', valor: 60000, pago: true, data: '2026-08-08', forma: 'Dinheiro' },
+  ] },
+  { id: 'p5', nome: 'Bruno Carvalho', funcao: 'Social media', contrato: 'freelancer', dia: 20, lanc: [
+    { id: 'e1', kind: 'servico', valor: 45000, pago: false, data: '2026-08-20', desc: 'pacote de 12 posts' },
+  ] },
+  { id: 'p6', nome: 'Marina Souza', funcao: 'Estoque', contrato: 'fixo', dia: 28, lanc: [
+    { id: 'f1', kind: 'salario', valor: 220000, pago: false, data: '2026-08-28' },
+  ] },
+  { id: 'p7', nome: 'Camila Ferreira', funcao: 'Vendas', contrato: 'fixo', dia: 30, lanc: [
+    { id: 'g1', kind: 'salario', valor: 190000, pago: false, data: '2026-08-30' },
+    { id: 'g2', kind: 'extra', valor: 24000, pago: false, data: '2026-08-30', desc: '8 h no sábado' },
+  ] },
+  { id: 'p8', nome: 'Rafael Moreira', funcao: 'Manutenção', contrato: 'freelancer', dia: 12, lanc: [
+    { id: 'h1', kind: 'servico', valor: 78000, pago: true, data: '2026-08-12', forma: 'Pix' },
+  ] },
+  { id: 'p9', nome: 'Juliana Prado', funcao: 'Atendimento', contrato: 'fixo', dia: 5, lanc: [
+    { id: 'i1', kind: 'salario', valor: 180000, pago: true, data: '2026-08-04', forma: 'Transferência' },
+  ] },
+];
+
+function digitos(raw) {
+  const d = String(raw == null ? '' : raw).replace(/\D/g, '');
+  return d ? Number(d.slice(0, 12)) : 0;
+}
+function centavosTexto(c) {
+  const s = Math.max(0, Math.round(c));
+  return Math.floor(s / 100).toLocaleString('pt-BR') + ',' + String(s % 100).padStart(2, '0');
+}
+function moeda(c) {
+  return 'R$ ' + centavosTexto(c);
+}
+function iniciais(nome) {
+  return nome.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
+}
+function diaTexto(d) {
+  return String(d).padStart(2, '0');
+}
+
+class Component extends DCLogic {
+  state = {
+    pessoas: PESSOAS,
+    filtro: 'todos',
+    abertos: {},
+    sheet: null,
+    alvo: null,
+    cents: 0,
+    kind: 'diaria',
+    forma: 'Pix',
+    data: HOJE,
+    obs: '',
+    comprovante: '',
+    nome: '',
+    funcao: '',
+    contrato: 'fixo',
+    valorBase: 0,
+    diaPag: '',
+    toast: '',
+    mes: 7,
+  };
+
+  resumo(p) {
+    let total = 0;
+    let pago = 0;
+    p.lanc.forEach((l) => {
+      const ef = KINDS[l.kind].efeito;
+      if (ef === 'soma') total += l.valor;
+      if (ef === 'abate') total -= l.valor;
+      if (l.pago && ef !== 'abate') pago += l.valor;
+    });
+    const falta = Math.max(0, total - pago);
+    const quitado = total > 0 && falta === 0;
+    const atrasado = falta > 0 && p.dia < 27;
+    return { total, pago, falta, quitado, atrasado };
+  }
+
+  setPessoas(fn) {
+    this.setState((s) => ({ pessoas: fn(s.pessoas) }));
+  }
+
+  flash(msg) {
+    this.setState({ toast: msg });
+    clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({ toast: '' }), 2600);
+  }
+
+  abrirSheet(modo, pessoa) {
+    const r = pessoa ? this.resumo(pessoa) : null;
+    this.setState({
+      sheet: modo,
+      alvo: pessoa || null,
+      cents: modo === 'pagar' ? r.falta : 0,
+      kind: pessoa && pessoa.contrato === 'fixo' ? 'salario' : pessoa && pessoa.contrato === 'diarista' ? 'diaria' : 'servico',
+      forma: 'Pix',
+      data: HOJE,
+      obs: '',
+      comprovante: '',
+      nome: pessoa && modo === 'pessoa' ? pessoa.nome : '',
+      funcao: pessoa && modo === 'pessoa' ? pessoa.funcao : '',
+      contrato: pessoa && modo === 'pessoa' ? pessoa.contrato : 'fixo',
+      valorBase: 0,
+      diaPag: pessoa && modo === 'pessoa' ? String(pessoa.dia) : '',
+    });
+  }
+
+  confirmar = () => {
+    const s = this.state;
+    if (s.sheet === 'pessoa') {
+      if (!s.nome.trim()) return this.flash('Falta o nome.');
+      const dia = Math.min(31, Math.max(1, Number(s.diaPag) || 5));
+      const id = 'n' + Date.now();
+      const lanc = s.valorBase > 0 && s.contrato === 'fixo'
+        ? [{ id: id + 'l', kind: 'salario', valor: s.valorBase, pago: false, data: '2026-08-' + diaTexto(dia) }]
+        : [];
+      const nova = { id: id, nome: s.nome.trim(), funcao: s.funcao.trim(), contrato: s.contrato, dia: dia, lanc: lanc };
+      const existe = s.alvo;
+      this.setPessoas((ps) => existe
+        ? ps.map((p) => (p.id === existe.id ? Object.assign({}, p, { nome: nova.nome, funcao: nova.funcao, contrato: nova.contrato, dia: nova.dia }) : p))
+        : ps.concat([nova]));
+      this.setState({ sheet: null, alvo: null });
+      return this.flash(existe ? 'Dados atualizados.' : s.nome.trim().split(' ')[0] + ' entrou na lista.');
+    }
+
+    if (s.cents <= 0) return this.flash('Coloque um valor.');
+    const alvo = s.alvo;
+
+    if (s.sheet === 'lancar') {
+      const novo = { id: 'x' + Date.now(), kind: s.kind, valor: s.cents, pago: false, data: s.data, desc: s.obs.trim() };
+      this.setPessoas((ps) => ps.map((p) => (p.id === alvo.id ? Object.assign({}, p, { lanc: p.lanc.concat([novo]) }) : p)));
+      this.setState({ sheet: null });
+      return this.flash(KINDS[s.kind].label + ' de ' + moeda(s.cents) + ' lançado.');
+    }
+
+    const r = this.resumo(alvo);
+    const quita = s.cents >= r.falta;
+    this.setPessoas((ps) => ps.map((p) => {
+      if (p.id !== alvo.id) return p;
+      if (quita) {
+        return Object.assign({}, p, {
+          lanc: p.lanc.map((l) => (l.pago || KINDS[l.kind].efeito === 'abate' ? l : Object.assign({}, l, { pago: true, data: s.data, forma: s.forma }))),
+        });
+      }
+      return Object.assign({}, p, {
+        lanc: p.lanc.concat([{ id: 'v' + Date.now(), kind: 'vale', valor: s.cents, pago: true, data: s.data, forma: s.forma, desc: s.obs.trim() }]),
+      });
+    }));
+    this.setState({ sheet: null });
+    this.flash(quita
+      ? alvo.nome.split(' ')[0] + ' está quitada — ' + moeda(s.cents)
+      : moeda(s.cents) + ' registrado · falta ' + moeda(r.falta - s.cents));
+  };
+
+  renderVals() {
+    const s = this.state;
+    const accent = this.props.accentColor || '#2c6fb5';
+    const discreto = !!this.props.modoDiscreto;
+    const ordem = this.props.ordenacao || 'Por vencimento';
+    const val = (c) => (discreto ? '••••' : moeda(c));
+
+    const lista = s.pessoas.map((p) => Object.assign({ p: p }, this.resumo(p)));
+    lista.sort((a, b) => {
+      if (ordem === 'Por maior valor') return b.falta - a.falta || a.p.nome.localeCompare(b.p.nome);
+      if (ordem === 'Por nome') return a.p.nome.localeCompare(b.p.nome);
+      return a.p.dia - b.p.dia || a.p.nome.localeCompare(b.p.nome);
+    });
+
+    const faltaTotal = lista.reduce((t, x) => t + x.falta, 0);
+    const pagoTotal = lista.reduce((t, x) => t + x.pago, 0);
+    const totalMes = lista.reduce((t, x) => t + x.total, 0);
+    const atrasados = lista.filter((x) => x.atrasado);
+    const atrasoTotal = atrasados.reduce((t, x) => t + x.falta, 0);
+    const proximo = lista.filter((x) => x.falta > 0 && !x.atrasado)[0];
+
+    const filtroDe = (x) => (x.quitado ? 'pagos' : x.atrasado ? 'atraso' : 'apagar');
+    const visiveis = s.filtro === 'todos' ? lista : lista.filter((x) => filtroDe(x) === s.filtro);
+
+    const linha = (x) => {
+      const p = x.p;
+      const aberto = !!s.abertos[p.id];
+      return {
+        nome: p.nome,
+        meta: (p.funcao ? p.funcao + ' · ' : '') + CONTRATO_LABEL[p.contrato],
+        iniciais: iniciais(p.nome),
+        dia: diaTexto(p.dia),
+        diaCor: x.atrasado ? '#b3452f' : '#8b939c',
+        avatarBg: x.quitado ? '#e6f3ec' : '#f2eee6',
+        avatarFg: x.quitado ? '#2f7d5c' : '#4a5159',
+        valor: x.total === 0 ? '—' : val(x.quitado ? x.total : x.falta),
+        valorCor: x.quitado ? '#2f7d5c' : '#1a1d21',
+        status: x.total === 0 ? 'sem lançamento' : x.quitado ? 'pago' : x.atrasado ? 'em atraso' : 'a pagar',
+        statusCor: x.quitado ? '#2f7d5c' : x.atrasado ? '#b3452f' : '#8b939c',
+        podePagar: x.falta > 0,
+        temParcial: x.falta > 0 && x.pago > 0,
+        progresso: (x.total > 0 ? Math.min(100, (x.pago / x.total) * 100) : 0) + '%',
+        pago: val(x.pago),
+        total: val(x.total),
+        aberto: aberto,
+        chevron: aberto ? '180deg' : '0deg',
+        temNota: !!p.nota,
+        nota: p.nota || '',
+        onToggle: () => this.setState((st) => ({ abertos: Object.assign({}, st.abertos, { [p.id]: !st.abertos[p.id] }) })),
+        onPagar: () => this.abrirSheet('pagar', p),
+        onLancar: () => this.abrirSheet('lancar', p),
+        onEditar: () => this.abrirSheet('pessoa', p),
+        lancamentos: p.lanc.map((l) => {
+          const ef = KINDS[l.kind].efeito;
+          const d = l.data.slice(8) + '/' + l.data.slice(5, 7);
+          return {
+            titulo: KINDS[l.kind].label + (l.desc ? ' · ' + l.desc : ''),
+            sub: d + (l.pago ? ' · pago' + (l.forma ? ' no ' + l.forma.toLowerCase() : '') : ' · a pagar') + (ef === 'antecipa' ? ' · abate do total' : ''),
+            valor: (ef === 'abate' ? '− ' : '') + val(l.valor),
+            cor: ef === 'abate' ? '#b3452f' : l.pago ? '#2f7d5c' : '#1a1d21',
+            boxBg: l.pago ? '#2f7d5c' : '#ffffff',
+            boxBorda: l.pago ? '#2f7d5c' : '#ddd8ce',
+            checkOpacidade: l.pago ? 1 : 0,
+            ariaLabel: l.pago ? 'Desmarcar pagamento' : 'Marcar como pago',
+            onToggle: () => this.setPessoas((ps) => ps.map((pp) => (pp.id === p.id
+              ? Object.assign({}, pp, { lanc: pp.lanc.map((ll) => (ll.id === l.id ? Object.assign({}, ll, { pago: !ll.pago }) : ll)) })
+              : pp))),
+          };
+        }),
+      };
+    };
+
+    const defGrupos = [
+      { key: 'atraso', titulo: 'Em atraso', cor: '#b3452f' },
+      { key: 'apagar', titulo: 'A pagar', cor: '#b8862a' },
+      { key: 'pagos', titulo: 'Pagos', cor: '#2f7d5c' },
+    ];
+    const grupos = defGrupos.map((g) => {
+      const items = visiveis.filter((x) => filtroDe(x) === g.key);
+      return {
+        titulo: g.titulo,
+        cor: g.cor,
+        count: items.length,
+        soma: val(items.reduce((t, x) => t + (g.key === 'pagos' ? x.total : x.falta), 0)),
+        items: items.map(linha),
+      };
+    }).filter((g) => g.count > 0);
+
+    const filtrosDef = [
+      { id: 'todos', label: 'Todos' },
+      { id: 'atraso', label: 'Em atraso' },
+      { id: 'apagar', label: 'A pagar' },
+      { id: 'pagos', label: 'Pagos' },
+    ];
+
+    const alvo = s.alvo;
+    const rAlvo = alvo ? this.resumo(alvo) : null;
+    const modo = s.sheet;
+
+    return {
+      accent: accent,
+      mesLabel: MESES[s.mes].charAt(0).toUpperCase() + MESES[s.mes].slice(1) + ' de 2026',
+      foraDoMesAtual: s.mes !== 7,
+      mesAnterior: () => this.setState({ mes: (s.mes + 11) % 12 }),
+      mesSeguinte: () => this.setState({ mes: (s.mes + 1) % 12 }),
+      voltarHoje: () => this.setState({ mes: 7 }),
+
+      faltaTotal: discreto ? '••••••' : moeda(faltaTotal),
+      pagoTotal: val(pagoTotal),
+      totalMes: val(totalMes),
+      progressoMes: (totalMes > 0 ? (pagoTotal / totalMes) * 100 : 0) + '%',
+      atrasoTotal: discreto ? '••••' : moeda(atrasoTotal),
+      atrasoLabel: atrasados.length === 1 ? '1 pessoa' : atrasados.length + ' pessoas',
+      proximoValor: proximo ? val(proximo.falta) : '—',
+      proximoLabel: proximo ? 'dia ' + proximo.p.dia + ' · ' + proximo.p.nome.split(' ')[0] : 'nada a vencer',
+
+      filtros: filtrosDef.map((f) => ({
+        label: f.label,
+        bg: s.filtro === f.id ? '#1a1d21' : 'transparent',
+        fg: s.filtro === f.id ? '#faf8f4' : '#8b939c',
+        onClick: () => this.setState({ filtro: f.id }),
+      })),
+
+      grupos: grupos,
+      listaVazia: grupos.length === 0,
+      vazioTitulo: s.pessoas.length === 0 ? 'Comece adicionando quem trabalha com ela' : 'Nada aqui neste filtro',
+      vazioTexto: s.pessoas.length === 0
+        ? 'Cadastre cada pessoa uma vez, com o valor e o dia de pagar. Depois é só lançar e marcar o que já saiu.'
+        : 'Troque o filtro para ver o resto do mês.',
+
+      sheetAberto: !!modo,
+      modoPessoa: modo === 'pessoa',
+      modoValor: modo === 'pagar' || modo === 'lancar',
+      modoLancar: modo === 'lancar',
+      sheetTitulo: modo === 'pessoa' ? (alvo ? 'Editar pessoa' : 'Nova pessoa') : modo === 'lancar' ? 'Lançar valor' : 'Registrar pagamento',
+      sheetSub: modo === 'pessoa'
+        ? (alvo ? alvo.nome : 'Cadastre uma vez, use todo mês.')
+        : alvo ? alvo.nome + ' · falta ' + moeda(rAlvo.falta) : '',
+      labelValor: modo === 'lancar' ? 'Valor' : 'Quanto está pagando agora',
+      labelValorBase: s.contrato === 'diarista' ? 'Valor da diária' : s.contrato === 'freelancer' ? 'Valor de referência' : 'Salário mensal',
+      valorTexto: s.cents ? centavosTexto(s.cents) : '',
+      onValor: (e) => this.setState({ cents: digitos(e.target.value) }),
+      mostrarAtalhos: modo === 'pagar' && !!rAlvo && rAlvo.falta > 0,
+      atalhos: rAlvo ? [
+        { label: 'Tudo · ' + moeda(rAlvo.falta), onClick: () => this.setState({ cents: rAlvo.falta }) },
+        { label: 'Metade', onClick: () => this.setState({ cents: Math.round(rAlvo.falta / 2) }) },
+      ] : [],
+
+      tipos: Object.keys(KINDS).map((k) => ({
+        label: KINDS[k].label,
+        bg: s.kind === k ? '#eef5fc' : '#ffffff',
+        borda: s.kind === k ? '#aecfef' : '#f2eee6',
+        fg: s.kind === k ? '#1b4f8a' : '#8b939c',
+        onClick: () => this.setState({ kind: k }),
+      })),
+      tipoHint: KINDS[s.kind].hint,
+
+      formas: FORMAS.map((f) => ({
+        label: f,
+        bg: s.forma === f ? '#ffffff' : 'transparent',
+        fg: s.forma === f ? '#1a1d21' : '#8b939c',
+        onClick: () => this.setState({ forma: f }),
+      })),
+      dataValor: s.data,
+      onData: (e) => this.setState({ data: e.target.value }),
+      comprovanteLabel: s.comprovante || 'Anexar foto ou PDF',
+      onComprovante: (e) => this.setState({ comprovante: e.target.files && e.target.files[0] ? e.target.files[0].name : '' }),
+      obs: s.obs,
+      onObs: (e) => this.setState({ obs: e.target.value }),
+
+      contratos: CONTRATOS.map((c) => ({
+        label: c.label,
+        bg: s.contrato === c.id ? '#ffffff' : 'transparent',
+        fg: s.contrato === c.id ? '#1a1d21' : '#8b939c',
+        onClick: () => this.setState({ contrato: c.id }),
+      })),
+      pessoaNome: s.nome,
+      onPessoaNome: (e) => this.setState({ nome: e.target.value }),
+      pessoaFuncao: s.funcao,
+      onPessoaFuncao: (e) => this.setState({ funcao: e.target.value }),
+      pessoaValorTexto: s.valorBase ? centavosTexto(s.valorBase) : '',
+      onPessoaValor: (e) => this.setState({ valorBase: digitos(e.target.value) }),
+      pessoaDia: s.diaPag,
+      onPessoaDia: (e) => this.setState({ diaPag: e.target.value.replace(/\D/g, '').slice(0, 2) }),
+
+      confirmarLabel: modo === 'pessoa'
+        ? (alvo ? 'Salvar' : 'Adicionar pessoa')
+        : modo === 'lancar'
+          ? (s.cents > 0 ? 'Lançar ' + moeda(s.cents) : 'Lançar')
+          : (s.cents > 0 ? 'Confirmar ' + moeda(s.cents) : 'Confirmar pagamento'),
+      confirmar: this.confirmar,
+      fecharSheet: () => this.setState({ sheet: null, alvo: null }),
+      abrirPessoa: () => this.abrirSheet('pessoa', null),
+
+      temToast: !!s.toast,
+      toast: s.toast,
+    };
+  }
+}
+
+</script>
+</body>
+</html>

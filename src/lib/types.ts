@@ -14,7 +14,19 @@ export interface Person {
   createdAt: string
 }
 
-export type EntryKind = 'salario' | 'servico' | 'extra' | 'adiantamento' | 'desconto'
+export type EntryKind =
+  | 'salario'
+  | 'diaria'
+  | 'servico'
+  | 'extra'
+  | 'reembolso'
+  | 'vale'
+  | 'desconto'
+
+/** Como o pagamento foi feito. */
+export type PaymentMethod = 'Pix' | 'Dinheiro' | 'Transferência' | 'Cartão'
+
+export const PAYMENT_METHODS: PaymentMethod[] = ['Pix', 'Dinheiro', 'Transferência', 'Cartão']
 
 export interface Entry {
   id: string
@@ -27,47 +39,87 @@ export interface Entry {
   date: string
   paid: boolean
   description: string
+  /** Forma de pagamento, preenchida quando o lançamento é quitado. */
+  method?: PaymentMethod
+  /**
+   * Nome do arquivo do comprovante. Hoje guardamos só o nome — a imagem em si
+   * fica de fora enquanto o armazenamento for localStorage (~5 MB no total).
+   * Quando migrar para o Firestore, o binário comprimido entra aqui ao lado
+   * (limite de 1 MB por documento).
+   */
+  receiptName?: string
   createdAt: string
 }
 
 export interface Database {
-  version: 1
+  version: 2
   people: Person[]
   entries: Entry[]
 }
 
 export const CONTRACT_LABEL: Record<ContractType, string> = {
   fixo: 'Salário fixo',
-  freelancer: 'Freelancer',
   diarista: 'Diária',
+  freelancer: 'Freelancer',
+}
+
+/** Rótulo curto usado no segmented control do cadastro. */
+export const CONTRACT_SHORT: Record<ContractType, string> = {
+  fixo: 'Fixo',
+  diarista: 'Diária',
+  freelancer: 'Freela',
 }
 
 export const KIND_LABEL: Record<EntryKind, string> = {
   salario: 'Salário',
-  servico: 'Serviço avulso',
-  extra: 'Extra / Bônus',
-  adiantamento: 'Adiantamento',
+  diaria: 'Diária',
+  servico: 'Serviço',
+  extra: 'Hora extra',
+  reembolso: 'Reembolso',
+  vale: 'Vale',
   desconto: 'Desconto',
 }
 
 export const KIND_HINT: Record<EntryKind, string> = {
   salario: 'O pagamento principal do mês.',
-  servico: 'Trabalho avulso — usado para freelancer e diária.',
-  extra: 'Bônus, gorjeta, ajuda de custo. Soma por fora do salário.',
-  adiantamento: 'Parte do salário paga antes da data. Abate do que falta pagar.',
-  desconto: 'Falta, adiantamento de mês anterior, material quebrado. Abate do total.',
+  diaria: 'Dias trabalhados no período.',
+  servico: 'Trabalho avulso, freelancer.',
+  extra: 'Horas ou plantão a mais, por fora do combinado.',
+  reembolso: 'Despesa que ela adiantou e você devolve.',
+  vale: 'Parte paga antes da data. Abate do que falta.',
+  desconto: 'Falta, material, adiantamento anterior. Reduz o total.',
 }
 
 /**
  * Como cada tipo entra na conta do mês:
- *  'soma'  → aumenta o total devido no mês (salário, serviço, extra)
- *  'abate' → reduz o total devido (desconto)
- *  'antecipa' → não muda o total; é uma parcela do total já quitada antes (adiantamento)
+ *  'soma'     → aumenta o total devido (salário, diária, serviço, extra, reembolso)
+ *  'abate'    → reduz o total devido (desconto)
+ *  'antecipa' → não muda o total; é uma parcela dele paga antes (vale)
  */
 export const KIND_EFFECT: Record<EntryKind, 'soma' | 'abate' | 'antecipa'> = {
   salario: 'soma',
+  diaria: 'soma',
   servico: 'soma',
   extra: 'soma',
+  reembolso: 'soma',
+  vale: 'antecipa',
   desconto: 'abate',
-  adiantamento: 'antecipa',
+}
+
+/** Ordem em que os tipos aparecem nos chips do sheet "Lançar valor". */
+export const KIND_ORDER: EntryKind[] = [
+  'salario',
+  'diaria',
+  'servico',
+  'extra',
+  'reembolso',
+  'vale',
+  'desconto',
+]
+
+/** Tipo sugerido ao lançar para alguém, conforme como a pessoa recebe. */
+export function defaultKindFor(contract: ContractType): EntryKind {
+  if (contract === 'fixo') return 'salario'
+  if (contract === 'diarista') return 'diaria'
+  return 'servico'
 }

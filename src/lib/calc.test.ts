@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRepeatedEntries, summarizeMonth, summarizePerson } from './calc'
+import { buildGroups, buildRepeatedEntries, sortSummaries, statusOf, summarizeMonth, summarizePerson } from './calc'
 import type { Entry, EntryKind, Person } from './types'
 
 const PERIOD = '2026-08'
@@ -53,7 +53,7 @@ describe('summarizePerson', () => {
   it('adiantamento pago abate do que falta, sem mudar o total', () => {
     const s = summarizePerson(
       person(),
-      [entry('salario', 2000, false), entry('adiantamento', 500, true, `${PERIOD}-01`)],
+      [entry('salario', 2000, false), entry('vale', 500, true, `${PERIOD}-01`)],
       PERIOD,
     )
     expect(s.total).toBe(2000)
@@ -65,7 +65,7 @@ describe('summarizePerson', () => {
   it('quitar o salário depois do adiantamento NÃO faz o pago passar do total', () => {
     const s = summarizePerson(
       person(),
-      [entry('salario', 2000, true), entry('adiantamento', 500, true, `${PERIOD}-01`)],
+      [entry('salario', 2000, true), entry('vale', 500, true, `${PERIOD}-01`)],
       PERIOD,
     )
     expect(s.total).toBe(2000)
@@ -77,7 +77,7 @@ describe('summarizePerson', () => {
   it('adiantamento ainda não pago não conta como desembolso', () => {
     const s = summarizePerson(
       person(),
-      [entry('salario', 2000, false), entry('adiantamento', 500, false)],
+      [entry('salario', 2000, false), entry('vale', 500, false)],
       PERIOD,
     )
     expect(s.pago).toBe(0)
@@ -119,14 +119,21 @@ describe('summarizePerson', () => {
     expect(s.falta).toBe(450)
   })
 
-  it('pendente com data passada aparece como atrasado', () => {
-    const s = summarizePerson(person(), [entry('salario', 2000, false, '2020-01-05')], PERIOD)
+  // "Atrasado" olha o dia combinado da pessoa, não a data do lançamento.
+  it('mês já passado com saldo em aberto conta como atraso', () => {
+    const s = summarizePerson(person(), [{ ...entry('salario', 2000, false), period: '2020-01' }], '2020-01')
     expect(s.atrasado).toBe(true)
   })
 
-  it('pendente com data futura não é atraso', () => {
-    const s = summarizePerson(person(), [entry('salario', 2000, false, '2099-01-05')], PERIOD)
+  it('mês futuro nunca é atraso, mesmo com tudo em aberto', () => {
+    const s = summarizePerson(person(), [{ ...entry('salario', 2000, false), period: '2099-01' }], '2099-01')
     expect(s.atrasado).toBe(false)
+  })
+
+  it('mês passado quitado não é atraso', () => {
+    const s = summarizePerson(person(), [{ ...entry('salario', 2000, true), period: '2020-01' }], '2020-01')
+    expect(s.atrasado).toBe(false)
+    expect(s.quitado).toBe(true)
   })
 
   it('ignora lançamentos de outro mês', () => {
@@ -148,7 +155,7 @@ describe('summarizeMonth', () => {
     const summaries = [
       summarizePerson(
         person(),
-        [entry('salario', 2000, true), entry('adiantamento', 500, true)],
+        [entry('salario', 2000, true), entry('vale', 500, true)],
         PERIOD,
       ),
       summarizePerson(
@@ -168,7 +175,7 @@ describe('summarizeMonth', () => {
     const summaries = [
       summarizePerson(
         person(),
-        [entry('salario', 2000, false), entry('adiantamento', 500, true)],
+        [entry('salario', 2000, false), entry('vale', 500, true)],
         PERIOD,
       ),
     ]
@@ -195,7 +202,7 @@ describe('buildRepeatedEntries', () => {
   it('NÃO repete adiantamento nem desconto', () => {
     const anterior = [
       { ...entry('salario', 2000, true), period: '2026-07', date: '2026-07-05' },
-      { ...entry('adiantamento', 500, true), period: '2026-07', date: '2026-07-01' },
+      { ...entry('vale', 500, true), period: '2026-07', date: '2026-07-01' },
       { ...entry('desconto', 100, true), period: '2026-07', date: '2026-07-20' },
     ]
     const novos = buildRepeatedEntries(anterior, '2026-07', '2026-08', pessoas, makeId)
@@ -238,5 +245,67 @@ describe('buildRepeatedEntries', () => {
 
   it('mês anterior vazio não gera nada', () => {
     expect(buildRepeatedEntries([], '2026-07', '2026-08', pessoas, makeId)).toHaveLength(0)
+  })
+})
+
+describe('agrupamento e ordenação', () => {
+  const base = (over: Partial<Person>) => person(over)
+
+  it('separa nos três grupos na ordem do design, sem os vazios', () => {
+    const quitada = summarizePerson(base({ id: 'q', name: 'Quitada' }), [
+      { ...entry('salario', 1000, true), personId: 'q' },
+    ], PERIOD)
+    const aberta = summarizePerson(base({ id: 'a', name: 'Aberta', payDay: 31 }), [
+      { ...entry('salario', 1000, false), personId: 'a' },
+    ], PERIOD)
+
+    const grupos = buildGroups([quitada, aberta])
+    // Só existem grupos com gente dentro.
+    expect(grupos.every((g) => g.items.length > 0)).toBe(true)
+    // A ordem relativa segue atraso → a pagar → pagos.
+    const keys = grupos.map((g) => g.key)
+    expect(keys).toEqual([...keys].sort((x, y) => {
+      const ord = { atraso: 0, apagar: 1, pagos: 2 } as const
+      return ord[x] - ord[y]
+    }))
+  })
+
+  it('soma do grupo Pagos usa o que já foi pago', () => {
+    const q = summarizePerson(base({ id: 'q' }), [{ ...entry('salario', 1000, true), personId: 'q' }], PERIOD)
+    const g = buildGroups([q]).find((x) => x.key === 'pagos')
+    expect(g?.soma).toBe(1000)
+  })
+
+  it('ordena por vencimento, maior valor e nome', () => {
+    const mk = (id: string, name: string, payDay: number, valor: number) =>
+      summarizePerson(base({ id, name, payDay }), [
+        { ...entry('salario', valor, false), personId: id },
+      ], PERIOD)
+
+    const zeca = mk('1', 'Zeca', 5, 100)
+    const ana = mk('2', 'Ana', 20, 900)
+
+    expect(sortSummaries([ana, zeca], 'vencimento').map((s) => s.person.name)).toEqual(['Zeca', 'Ana'])
+    expect(sortSummaries([zeca, ana], 'valor').map((s) => s.person.name)).toEqual(['Ana', 'Zeca'])
+    expect(sortSummaries([zeca, ana], 'nome').map((s) => s.person.name)).toEqual(['Ana', 'Zeca'])
+  })
+
+  it('quem não tem lançamento cai em "a pagar", não em "pagos"', () => {
+    const s = summarizePerson(base({ id: 'z', payDay: 31 }), [], PERIOD)
+    expect(statusOf(s)).toBe('apagar')
+  })
+})
+
+describe('novos tipos de lançamento', () => {
+  it('diária e reembolso somam ao total', () => {
+    const s = summarizePerson(person(), [entry('diaria', 900, false), entry('reembolso', 60, false)], PERIOD)
+    expect(s.total).toBe(960)
+  })
+
+  it('vale pago abate sem inflar o total (regra herdada do adiantamento)', () => {
+    const s = summarizePerson(person(), [entry('salario', 2000, false), entry('vale', 500, true)], PERIOD)
+    expect(s.total).toBe(2000)
+    expect(s.pago).toBe(500)
+    expect(s.falta).toBe(1500)
   })
 })
