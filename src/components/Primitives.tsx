@@ -28,8 +28,7 @@ export function Button({
   title,
 }: ButtonProps) {
   const styles: Record<NonNullable<ButtonProps['variant']>, string> = {
-    primary:
-      'bg-butterfly-500 text-white hover:bg-butterfly-600 shadow-[0_1px_2px_rgba(27,79,138,0.3)]',
+    primary: 'bg-ink text-cream hover:bg-ink-soft',
     ghost:
       'bg-butterfly-50 text-butterfly-600 hover:bg-butterfly-100 border border-butterfly-100',
     quiet: 'bg-white text-ink-soft hover:bg-cream border border-cream-deep hover:text-ink',
@@ -94,7 +93,7 @@ export function EmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+    <div className="flex flex-col items-center gap-3 px-6 py-20 text-center">
       <ButterflyMark className="h-10 w-10 opacity-30" />
       <h3 className="font-display text-lg text-ink">{title}</h3>
       <p className="max-w-sm text-sm leading-relaxed text-ink-soft">{description}</p>

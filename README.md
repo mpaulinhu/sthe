@@ -54,18 +54,31 @@ A diferença entre **Adiantamento** e **Extra** é importante:
 
 O botão **Quitar** marca de uma vez tudo que está pendente daquela pessoa no mês.
 
+## Coisas que facilitam o dia a dia
+
+- **Valor se formata sozinho.** Digite só os números: `250000` vira `2.500,00`
+  enquanto você escreve. Sem vírgula, sem ponto de milhar, sem se preocupar com
+  centavos.
+- **Repetir o mês anterior.** Quando o mês vira e ainda não há nada lançado,
+  aparece um atalho para trazer os pagamentos do mês passado, todos como "não
+  pagos" — assim não precisa redigitar o salário de todo mundo. Adiantamentos e
+  descontos **não** são repetidos, porque são pontuais daquele mês.
+- **Resumo dos meses.** No menu (⋮), mostra os últimos 6 meses e a média gasta.
+- **Tirar alguém da lista.** Ao editar a pessoa, em "Não trabalha mais aqui". O
+  histórico dos meses anteriores continua salvo.
+
 ## Onde os dados ficam
 
 Tudo é salvo **no navegador do próprio computador** (localStorage) — não vai para
 nenhum servidor e não precisa de internet nem de login.
 
-Isso significa que **limpar os dados do navegador apaga tudo**. Por isso existem
-os botões:
+Isso significa que **limpar os dados do navegador apaga tudo**. Por isso, no menu
+(⋮) do canto superior direito existem:
 
-- **Backup** — baixa um arquivo `.json` com todos os dados.
-- **Importar** — restaura um backup desses (substitui o que estiver lá).
+- **Baixar meus dados** — salva um arquivo `.json` com tudo.
+- **Restaurar backup** — recarrega um arquivo desses (substitui o que estiver lá).
 
-Vale baixar um backup de vez em quando e guardar em algum lugar seguro.
+Vale baixar uma cópia de vez em quando e guardar em algum lugar seguro.
 
 ## Estrutura
 
@@ -73,8 +86,10 @@ Vale baixar um backup de vez em quando e guardar em algum lugar seguro.
 src/
   lib/
     types.ts       # modelo de dados (pessoas, lançamentos)
-    calc.ts        # regras de cálculo do mês
+    calc.ts        # regras do mês + repetir lançamentos do mês anterior
     calc.test.ts   # testes das regras
+    money.ts       # formatação de dinheiro ao digitar
+    money.test.ts  # testes da formatação
     storage.ts     # salvar/carregar/exportar
   components/      # cards, formulários, primitivos de UI
   App.tsx          # a tela

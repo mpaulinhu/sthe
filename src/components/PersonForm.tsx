@@ -1,22 +1,25 @@
 import { useState } from 'react'
 import { Modal } from './Modal'
 import { Button, Field, inputClass } from './Primitives'
+import { MoneyInput } from './MoneyInput'
 import { CONTRACT_LABEL, type ContractType, type Person } from '../lib/types'
 import { uid } from '../lib/storage'
 
 export function PersonForm({
   initial,
   onSave,
+  onArchive,
   onClose,
 }: {
   initial?: Person
   onSave: (person: Person) => void
+  onArchive?: () => void
   onClose: () => void
 }) {
   const [name, setName] = useState(initial?.name ?? '')
   const [role, setRole] = useState(initial?.role ?? '')
   const [contract, setContract] = useState<ContractType>(initial?.contract ?? 'fixo')
-  const [baseAmount, setBaseAmount] = useState(String(initial?.baseAmount ?? ''))
+  const [baseAmount, setBaseAmount] = useState(initial?.baseAmount ?? 0)
   const [payDay, setPayDay] = useState(String(initial?.payDay ?? 5))
   const [notes, setNotes] = useState(initial?.notes ?? '')
   const [error, setError] = useState('')
@@ -32,7 +35,7 @@ export function PersonForm({
       name: name.trim(),
       role: role.trim(),
       contract,
-      baseAmount: Number(baseAmount.replace(',', '.')) || 0,
+      baseAmount,
       payDay: day >= 1 && day <= 31 ? day : 5,
       active: initial?.active ?? true,
       notes: notes.trim(),
@@ -99,14 +102,8 @@ export function PersonForm({
         </Field>
 
         <div className="grid grid-cols-2 gap-4">
-          <Field label={baseLabel} hint="Pode deixar 0 se varia todo mês.">
-            <input
-              className={inputClass}
-              value={baseAmount}
-              onChange={(e) => setBaseAmount(e.target.value)}
-              inputMode="decimal"
-              placeholder="0,00"
-            />
+          <Field label={baseLabel} hint="Pode deixar vazio se varia todo mês.">
+            <MoneyInput value={baseAmount} onChange={setBaseAmount} label={baseLabel} />
           </Field>
           <Field label="Dia de pagar" hint="Serve para avisar de atraso.">
             <input
@@ -136,6 +133,21 @@ export function PersonForm({
           </Button>
           <Button onClick={onClose}>Cancelar</Button>
         </div>
+
+        {initial && onArchive ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm(`Tirar ${initial.name} da lista? O histórico dos meses anteriores continua salvo.`)) {
+                onArchive()
+                onClose()
+              }
+            }}
+            className="mt-1 self-center text-sm text-ink-faint underline-offset-4 transition-colors hover:text-late hover:underline"
+          >
+            Não trabalha mais aqui
+          </button>
+        ) : null}
       </form>
     </Modal>
   )

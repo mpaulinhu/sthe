@@ -98,6 +98,51 @@ export function summarizePerson(person: Person, allEntries: Entry[], period: str
   }
 }
 
+/**
+ * Monta os lançamentos do mês novo a partir do mês anterior, para ela não ter
+ * que redigitar o salário de todo mundo. Copia só o que é recorrente (salário e
+ * descontos fixos não entram: desconto e adiantamento são pontuais daquele mês),
+ * sempre como "ainda não pago", ajustando a data para o mês de destino.
+ */
+export function buildRepeatedEntries(
+  entries: Entry[],
+  fromPeriod: string,
+  toPeriod: string,
+  people: Person[],
+  makeId: () => string,
+): Entry[] {
+  const jaTem = new Set(entries.filter((e) => e.period === toPeriod).map((e) => e.personId))
+  const ativos = new Set(people.filter((p) => p.active).map((p) => p.id))
+
+  return entries
+    .filter(
+      (e) =>
+        e.period === fromPeriod &&
+        // Só o que se repete todo mês. Adiantamento e desconto são do mês em que
+        // aconteceram — repetir criaria cobrança que ela nunca combinou.
+        (e.kind === 'salario' || e.kind === 'servico') &&
+        ativos.has(e.personId) &&
+        // Quem já tem qualquer lançamento no mês novo fica de fora, para não duplicar.
+        !jaTem.has(e.personId),
+    )
+    .map((e) => ({
+      ...e,
+      id: makeId(),
+      period: toPeriod,
+      date: moveDateToPeriod(e.date, toPeriod),
+      paid: false,
+      createdAt: new Date().toISOString(),
+    }))
+}
+
+/** Mantém o dia, troca o mês/ano — respeitando meses mais curtos (31 → 28/30). */
+function moveDateToPeriod(iso: string, period: string): string {
+  const [y, m] = period.split('-').map(Number)
+  const dia = Number(iso?.split('-')[2]) || 1
+  const ultimoDia = new Date(y, m, 0).getDate()
+  return `${period}-${String(Math.min(dia, ultimoDia)).padStart(2, '0')}`
+}
+
 export function summarizeMonth(summaries: PersonSummary[]): MonthSummary {
   return summaries.reduce<MonthSummary>(
     (acc, s) => {

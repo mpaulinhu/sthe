@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Modal } from './Modal'
 import { Button, Field, inputClass } from './Primitives'
+import { MoneyInput } from './MoneyInput'
 import { KIND_HINT, KIND_LABEL, type Entry, type EntryKind, type Person } from '../lib/types'
 import { uid } from '../lib/storage'
 import { formatPeriod } from '../lib/calc'
@@ -28,16 +29,14 @@ export function EntryForm({
   const [kind, setKind] = useState<EntryKind>(
     initial?.kind ?? (person.contract === 'fixo' ? 'salario' : 'servico'),
   )
-  const [amount, setAmount] = useState(
-    String(initial?.amount ?? (person.contract === 'fixo' ? person.baseAmount || '' : person.baseAmount || '')),
-  )
+  const [amount, setAmount] = useState(initial?.amount ?? person.baseAmount ?? 0)
   const [date, setDate] = useState(initial?.date ?? defaultDate(period, person.payDay))
   const [paid, setPaid] = useState(initial?.paid ?? false)
   const [description, setDescription] = useState(initial?.description ?? '')
   const [error, setError] = useState('')
 
   function submit() {
-    const value = Number(amount.replace(',', '.'))
+    const value = amount
     if (!value || value <= 0) {
       setError('Coloque um valor maior que zero.')
       return
@@ -92,16 +91,15 @@ export function EntryForm({
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="Valor">
-            <input
-              className={inputClass}
+            <MoneyInput
               value={amount}
-              onChange={(e) => {
-                setAmount(e.target.value)
+              onChange={(v) => {
+                setAmount(v)
                 setError('')
               }}
-              inputMode="decimal"
-              placeholder="0,00"
+              size="lg"
               autoFocus
+              label="Valor"
             />
           </Field>
           <Field label="Data">

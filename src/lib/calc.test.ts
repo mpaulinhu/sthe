@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { summarizeMonth, summarizePerson } from './calc'
+import { buildRepeatedEntries, summarizeMonth, summarizePerson } from './calc'
 import type { Entry, EntryKind, Person } from './types'
 
 const PERIOD = '2026-08'
@@ -174,5 +174,69 @@ describe('summarizeMonth', () => {
     ]
     const m = summarizeMonth(summaries)
     expect(m.pago + m.falta).toBe(m.total)
+  })
+})
+
+describe('buildRepeatedEntries', () => {
+  const pessoas = [person(), person({ id: 'p2', name: 'Bruno' })]
+  let n = 0
+  const makeId = () => `novo${n++}`
+
+  it('repete salário do mês anterior como não pago', () => {
+    const anterior = [{ ...entry('salario', 2000, true), period: '2026-07', date: '2026-07-05' }]
+    const novos = buildRepeatedEntries(anterior, '2026-07', '2026-08', pessoas, makeId)
+    expect(novos).toHaveLength(1)
+    expect(novos[0].period).toBe('2026-08')
+    expect(novos[0].date).toBe('2026-08-05')
+    expect(novos[0].amount).toBe(2000)
+    expect(novos[0].paid).toBe(false)
+  })
+
+  it('NÃO repete adiantamento nem desconto', () => {
+    const anterior = [
+      { ...entry('salario', 2000, true), period: '2026-07', date: '2026-07-05' },
+      { ...entry('adiantamento', 500, true), period: '2026-07', date: '2026-07-01' },
+      { ...entry('desconto', 100, true), period: '2026-07', date: '2026-07-20' },
+    ]
+    const novos = buildRepeatedEntries(anterior, '2026-07', '2026-08', pessoas, makeId)
+    expect(novos.map((e) => e.kind)).toEqual(['salario'])
+  })
+
+  it('não duplica quem já tem lançamento no mês novo', () => {
+    const anterior = [
+      { ...entry('salario', 2000, true), period: '2026-07', date: '2026-07-05' },
+      { ...entry('salario', 900, true), personId: 'p2', period: '2026-07', date: '2026-07-10' },
+    ]
+    const jaLancado = [{ ...entry('salario', 2000, false), period: '2026-08' }]
+    const novos = buildRepeatedEntries(
+      [...anterior, ...jaLancado],
+      '2026-07',
+      '2026-08',
+      pessoas,
+      makeId,
+    )
+    expect(novos.map((e) => e.personId)).toEqual(['p2'])
+  })
+
+  it('ignora quem foi desativado', () => {
+    const anterior = [{ ...entry('salario', 2000, true), period: '2026-07', date: '2026-07-05' }]
+    const novos = buildRepeatedEntries(
+      anterior,
+      '2026-07',
+      '2026-08',
+      [person({ active: false })],
+      makeId,
+    )
+    expect(novos).toHaveLength(0)
+  })
+
+  it('dia 31 vira o último dia de um mês curto', () => {
+    const anterior = [{ ...entry('salario', 2000, true), period: '2026-01', date: '2026-01-31' }]
+    const novos = buildRepeatedEntries(anterior, '2026-01', '2026-02', pessoas, makeId)
+    expect(novos[0].date).toBe('2026-02-28')
+  })
+
+  it('mês anterior vazio não gera nada', () => {
+    expect(buildRepeatedEntries([], '2026-07', '2026-08', pessoas, makeId)).toHaveLength(0)
   })
 })
