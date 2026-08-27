@@ -80,6 +80,26 @@ Isso significa que **limpar os dados do navegador apaga tudo**. Por isso, no men
 
 Vale baixar uma cópia de vez em quando e guardar em algum lugar seguro.
 
+## Git — duas contas na mesma máquina
+
+Este repo vive na conta **pessoal** (`mpaulinhu/sthe`, privado), mas a máquina
+costuma ter a conta de **trabalho** (`Marcospaulo-elo`) ativa no `gh`. Sem
+nenhum ajuste, `git push` daqui falha com um enganoso `Repository not found`
+(é falta de permissão, não repo inexistente).
+
+Já está resolvido: o `.git/config` deste repo usa um credential helper próprio
+(`~/.githelpers/credential-mpaulinhu.sh`) que pega o token da conta pessoal
+direto do `gh`, independente de qual conta está ativa. Não é preciso ficar
+trocando com `gh auth switch`.
+
+Se algum dia o push voltar a pedir senha, confira se a conta pessoal continua
+logada:
+
+```bash
+gh auth status            # deve listar mpaulinhu
+gh auth login             # se não estiver
+```
+
 ## Estrutura
 
 ```
