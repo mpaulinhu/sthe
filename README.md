@@ -70,6 +70,11 @@ mostra o quanto já saiu.
   aparece um atalho para trazer os pagamentos do mês passado, todos como "não
   pagos" — assim não precisa redigitar o salário de todo mundo. Adiantamentos e
   descontos **não** são repetidos, porque são pontuais daquele mês.
+- **Filtro por tipo.** Uma segunda linha de chips (Fixos / Diaristas / Freelas)
+  filtra a lista sem mexer no total do topo — assim dá para olhar só os
+  diaristas sem perder de vista quanto falta pagar no mês inteiro. Os dois
+  filtros se combinam ("diaristas em atraso"), e a linha some quando só existe
+  um tipo cadastrado.
 - **Modo discreto.** O olho no topo troca todo valor por `••••`, para abrir a
   tela na frente da equipe sem expor salário de ninguém.
 - **Ordenação.** Por vencimento (padrão), maior valor ou nome.

@@ -21,13 +21,32 @@ import {
   type FilterKey,
   type SortKey,
 } from './lib/calc'
-import { KIND_EFFECT, KIND_LABEL, type Database, type Entry, type Person } from './lib/types'
+import {
+  KIND_EFFECT,
+  KIND_LABEL,
+  type ContractType,
+  type Database,
+  type Entry,
+  type Person,
+} from './lib/types'
 
 const FILTROS: { id: FilterKey; label: string }[] = [
   { id: 'todos', label: 'Todos' },
   { id: 'atraso', label: 'Em atraso' },
   { id: 'apagar', label: 'A pagar' },
   { id: 'pagos', label: 'Pagos' },
+]
+
+/**
+ * Filtro por forma de contratação. É uma dimensão separada do status: ela pode
+ * ver "só os diaristas que estão em atraso", por exemplo. Fica escondido
+ * enquanto houver só um tipo cadastrado — aí não teria o que filtrar.
+ */
+const TIPOS: { id: ContractType | 'todos'; label: string }[] = [
+  { id: 'todos', label: 'Todo mundo' },
+  { id: 'fixo', label: 'Fixos' },
+  { id: 'diarista', label: 'Diaristas' },
+  { id: 'freelancer', label: 'Freelas' },
 ]
 
 const ORDENS: { id: SortKey; label: string }[] = [
@@ -45,6 +64,7 @@ export default function App() {
   const [db, setDb] = useState<Database>(() => loadDb())
   const [period, setPeriod] = useState(currentPeriod)
   const [filtro, setFiltro] = useState<FilterKey>('todos')
+  const [tipo, setTipo] = useState<ContractType | 'todos'>('todos')
   const [sort, setSort] = useState<SortKey>('vencimento')
   const [abertos, setAbertos] = useState<Record<string, boolean>>({})
   const [sheet, setSheet] = useState<SheetState>(null)
@@ -65,9 +85,15 @@ export default function App() {
 
   const stats = useMemo(() => monthStats(summaries), [summaries])
 
+  // Os dois filtros se combinam e valem só para a LISTA. O resumo do mês lá em
+  // cima continua somando todo mundo de propósito: é a resposta de "quanto
+  // falta pagar no total" — se ele mudasse junto, ela perderia essa visão.
   const visiveis = useMemo(
-    () => (filtro === 'todos' ? summaries : summaries.filter((s) => statusOf(s) === filtro)),
-    [summaries, filtro],
+    () =>
+      summaries
+        .filter((s) => filtro === 'todos' || statusOf(s) === filtro)
+        .filter((s) => tipo === 'todos' || s.person.contract === tipo),
+    [summaries, filtro, tipo],
   )
 
   const grupos = useMemo(() => buildGroups(visiveis), [visiveis])
@@ -80,6 +106,21 @@ export default function App() {
         : [],
     [mesVazio, db.entries, period, people],
   )
+
+  // Quantas pessoas há de cada tipo — alimenta a contagem nos chips e decide
+  // se vale mostrar o filtro (com um tipo só, não há o que separar).
+  const contagemPorTipo = useMemo(() => {
+    const acc = { fixo: 0, diarista: 0, freelancer: 0 } as Record<ContractType, number>
+    people.forEach((p) => {
+      acc[p.contract] += 1
+    })
+    return acc
+  }, [people])
+
+  const tiposPresentes = (Object.keys(contagemPorTipo) as ContractType[]).filter(
+    (t) => contagemPorTipo[t] > 0,
+  )
+  const mostrarFiltroTipo = tiposPresentes.length > 1
 
   const progressoMes = stats.total > 0 ? Math.min(100, (stats.pago / stats.total) * 100) : 0
   const ehMesAtual = period === currentPeriod()
@@ -347,7 +388,7 @@ export default function App() {
             </div>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-1.5 pb-3.5 pt-5">
+          <div className="flex flex-wrap items-center gap-1.5 pb-2 pt-5">
             {FILTROS.map((f) => (
               <button
                 key={f.id}
@@ -378,6 +419,34 @@ export default function App() {
             </div>
           </div>
 
+          {mostrarFiltroTipo ? (
+            <div className="flex flex-wrap items-center gap-1.5 pb-3.5">
+              {TIPOS.filter((t) => t.id === 'todos' || contagemPorTipo[t.id] > 0).map((t) => {
+                const ativo = tipo === t.id
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setTipo(t.id)}
+                    aria-pressed={ativo}
+                    className={`rounded-full border px-3 py-[5px] text-[12.5px] font-medium transition-colors ${
+                      ativo
+                        ? 'border-butterfly-200 bg-butterfly-50 text-butterfly-600'
+                        : 'border-cream-deep bg-white text-ink-faint hover:text-ink-soft'
+                    }`}
+                  >
+                    {t.label}
+                    {t.id !== 'todos' ? (
+                      <span className={ativo ? 'text-butterfly-500' : 'text-ink-dim'}>
+                        {' '}
+                        {contagemPorTipo[t.id]}
+                      </span>
+                    ) : null}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
+
           {people.length === 0 || grupos.length === 0 ? (
             <Vazio
               titulo={
@@ -388,7 +457,9 @@ export default function App() {
               texto={
                 people.length === 0
                   ? 'Cadastre cada pessoa uma vez, com o valor e o dia de pagar. Depois é só lançar os pagamentos do mês e marcar o que já saiu.'
-                  : 'Troque o filtro para ver as outras pessoas.'
+                  : tipo !== 'todos' && filtro !== 'todos'
+                    ? 'Nenhuma pessoa desse tipo nesta situação. Troque um dos dois filtros.'
+                    : 'Troque o filtro para ver as outras pessoas.'
               }
               acao={
                 people.length === 0 ? (
