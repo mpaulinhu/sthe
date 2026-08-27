@@ -41,9 +41,9 @@ export function Sheet({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-white shadow-[-24px_0_60px_-30px_rgba(26,29,33,0.4)] [animation:sheetIn_.22s_cubic-bezier(.2,.7,.3,1)] sm:h-full sm:max-h-none sm:w-[428px] sm:rounded-none"
+        className="relative flex max-h-[88dvh] w-full flex-col rounded-t-2xl bg-white shadow-[-24px_0_60px_-30px_rgba(26,29,33,0.4)] [animation:sheetIn_.22s_cubic-bezier(.2,.7,.3,1)] sm:h-full sm:max-h-none sm:w-[428px] sm:rounded-none"
       >
-        <header className="flex items-start gap-3 border-b border-cream-deep px-6 pb-[18px] pt-[22px]">
+        <header className="flex shrink-0 items-start gap-3 border-b border-cream-deep px-6 pb-[18px] pt-[22px]">
           <div className="min-w-0 flex-1">
             <h2 className="font-display text-[22px] font-semibold tracking-[0.01em]">{title}</h2>
             {subtitle ? <p className="mt-1 text-[13px] text-ink-faint">{subtitle}</p> : null}
@@ -67,11 +67,15 @@ export function Sheet({
           </button>
         </header>
 
-        <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-6 pb-[26px] pt-[22px]">
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 pb-[26px] pt-[22px]">
           {children}
         </div>
 
-        <footer className="flex items-center gap-2.5 border-t border-cream-deep bg-surface-sunken px-6 py-4">
+        {/*
+          `pb-[calc(...)]` respeita a área segura do aparelho: sem isso o botão
+          principal encosta na borda e cai embaixo da barra de gestos do celular.
+        */}
+        <footer className="flex shrink-0 items-center gap-2.5 border-t border-cream-deep bg-surface-sunken px-6 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-4">
           {footer}
         </footer>
       </div>

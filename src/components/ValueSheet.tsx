@@ -77,13 +77,13 @@ export function ValueSheet({
         <>
           <button
             onClick={onClose}
-            className="rounded-[11px] border border-cream-deep bg-white px-[15px] py-[11px] text-[14px] text-ink-soft transition-colors hover:bg-cream"
+            className="min-h-[44px] rounded-[11px] border border-cream-deep bg-white px-[15px] py-[11px] text-[14px] text-ink-soft transition-colors hover:bg-cream"
           >
             Cancelar
           </button>
           <button
             onClick={confirm}
-            className="flex-1 rounded-[11px] bg-ink px-4 py-3 text-[14.5px] font-medium text-cream transition-colors hover:bg-ink-hover"
+            className="min-h-[44px] flex-1 rounded-[11px] bg-ink px-4 py-3 text-[14.5px] font-medium text-cream transition-colors hover:bg-ink-hover"
           >
             {isPagar ? 'Confirmar' : 'Lançar'} {formatMoney(centsToNumber(cents))}
           </button>
