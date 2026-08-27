@@ -258,7 +258,13 @@ export default function App() {
       <Sidebar onExport={() => exportDb(db)} />
 
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex items-center gap-3.5 border-b border-cream-deep bg-[rgba(250,248,244,0.88)] px-5 py-3.5 backdrop-blur-[10px] sm:px-8">
+        {/*
+          A barra atravessa a tela toda (fundo e borda), mas o conteúdo interno
+          usa a mesma coluna de 1040px do corpo — senão o "Nova pessoa" fica
+          jogado no canto, longe da lista, em telas largas.
+        */}
+        <header className="sticky top-0 z-20 border-b border-cream-deep bg-[rgba(250,248,244,0.88)] backdrop-blur-[10px]">
+          <div className="mx-auto flex w-full max-w-[1040px] items-center gap-3.5 px-5 py-3.5 sm:px-8">
           <div className="flex items-center gap-1">
             <button
               onClick={() => setPeriod(shiftPeriod(period, -1))}
@@ -319,10 +325,11 @@ export default function App() {
               </svg>
               <span className="hidden sm:inline">Nova pessoa</span>
             </button>
+            </div>
           </div>
         </header>
 
-        <div className="w-full max-w-[1040px] px-5 pb-16 pt-[34px] sm:px-8">
+        <div className="mx-auto w-full max-w-[1040px] px-5 pb-16 pt-[34px] sm:px-8">
           <section className="flex flex-wrap items-end gap-x-10 gap-y-6 border-b border-cream-deep pb-[26px]">
             <div className="min-w-[260px]">
               <p className="mb-1.5 text-[12px] uppercase tracking-[0.1em] text-ink-faint">
