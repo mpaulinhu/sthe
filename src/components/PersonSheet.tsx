@@ -17,6 +17,13 @@ const BASE_LABEL: Record<ContractType, string> = {
   freelancer: 'Valor de referência',
 }
 
+/** Explica para que o valor serve: ele pré-preenche o lançamento depois. */
+const BASE_HINT: Record<ContractType, string> = {
+  fixo: 'Já vem preenchido ao lançar o salário do mês.',
+  diarista: 'Valor de um dia. Ao lançar, dá para multiplicar pelos dias.',
+  freelancer: 'Sugestão ao lançar. Pode deixar vazio se varia sempre.',
+}
+
 export function PersonSheet({
   initial,
   onSave,
@@ -108,6 +115,7 @@ export function PersonSheet({
         <label className="flex flex-1 flex-col gap-[7px]">
           <Label>{BASE_LABEL[contract]}</Label>
           <MoneyInput cents={cents} onChange={setCents} label={BASE_LABEL[contract]} />
+          <span className="text-[12px] leading-snug text-ink-dim">{BASE_HINT[contract]}</span>
         </label>
         <label className="flex w-[120px] flex-col gap-[7px]">
           <Label>Dia de pagar</Label>

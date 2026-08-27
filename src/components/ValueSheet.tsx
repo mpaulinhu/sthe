@@ -50,9 +50,15 @@ export function ValueSheet({
   onError: (msg: string) => void
 }) {
   const falta = numberToCents(summary.falta)
+  const base = numberToCents(person.baseAmount)
 
-  const [cents, setCents] = useState(mode === 'pagar' ? falta : 0)
-  const [kind, setKind] = useState<EntryKind>(defaultKindFor(person.contract))
+  const kindInicial = defaultKindFor(person.contract)
+
+  // Ao lançar, já vem preenchido com o valor combinado no cadastro (salário
+  // mensal, diária ou referência) — é para isso que aquele campo existe.
+  // Ela só ajusta quando o mês foge do padrão, em vez de redigitar sempre.
+  const [cents, setCents] = useState(mode === 'pagar' ? falta : base)
+  const [kind, setKind] = useState<EntryKind>(kindInicial)
   const [method, setMethod] = useState<PaymentMethod>('Pix')
   const [date, setDate] = useState(todayIso())
   const [obs, setObs] = useState('')
@@ -98,7 +104,13 @@ export function ValueSheet({
               <button
                 key={k}
                 type="button"
-                onClick={() => setKind(k)}
+                onClick={() => {
+                  // O valor base só vale para o tipo padrão da pessoa. Trocar
+                  // para vale/desconto/reembolso zera, para ela não confirmar
+                  // sem querer um desconto do tamanho do salário.
+                  if (k !== kind) setCents(k === kindInicial ? base : 0)
+                  setKind(k)
+                }}
                 aria-pressed={kind === k}
                 className={`rounded-full border px-3 py-2 text-[13px] font-medium transition-colors ${
                   kind === k
@@ -117,6 +129,30 @@ export function ValueSheet({
       <div className="flex flex-col gap-2">
         <Label>{isPagar ? 'Quanto você pagou' : 'Valor'}</Label>
         <MoneyInput cents={cents} onChange={setCents} autoFocus label="Valor" variant="display" />
+
+        {/* Atalhos de diária: o valor base é de UM dia, e ela quase sempre
+            lança vários de uma vez. Multiplicar aqui evita conta de cabeça. */}
+        {!isPagar && person.contract === 'diarista' && base > 0 && kind === 'diaria' ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[12.5px] text-ink-dim">
+              {formatMoney(person.baseAmount)} por dia ·
+            </span>
+            {[1, 5, 10, 20, 22].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => {
+                  setCents(base * n)
+                  if (!obs.trim()) setObs(`${n} ${n === 1 ? 'diária' : 'diárias'}`)
+                }}
+                className="rounded-[9px] border border-cream-deep bg-white px-2.5 py-[5px] text-[12.5px] text-ink-soft transition-colors hover:bg-cream"
+              >
+                {n}×
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         {isPagar && falta > 0 ? (
           <div className="flex gap-1.5">
             <button
