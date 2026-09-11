@@ -229,6 +229,30 @@ export default function App() {
     if (alvo) flash(`${alvo.name.split(' ')[0]} voltou pra lista.`)
   }
 
+  /**
+   * Exclusão de verdade — diferente de "não trabalha mais aqui", que só
+   * arquiva preservando histórico. Aqui some com a pessoa e tudo que só faz
+   * sentido ligado a ela (lançamentos, participação em meses, recibos);
+   * itens de agenda continuam existindo, só perdem a referência a ela.
+   */
+  function deletePerson(id: string) {
+    const alvo = db.people.find((p) => p.id === id)
+    setDb((d) => ({
+      ...d,
+      people: d.people.filter((p) => p.id !== id),
+      entries: d.entries.filter((e) => e.personId !== id),
+      monthMemberships: d.monthMemberships.filter((m) => m.personId !== id),
+      recibos: d.recibos.filter((r) => r.personId !== id),
+      agenda: d.agenda.map((item) =>
+        item.personIds.includes(id)
+          ? { ...item, personIds: item.personIds.filter((pid) => pid !== id) }
+          : item,
+      ),
+    }))
+    setSheet(null)
+    if (alvo) flash(`${alvo.name.split(' ')[0]} foi excluído.`)
+  }
+
   /** Marca quem foi escolhido no sheet "Adicionar ao mês" como participante. */
   function addMonthMembers(personIds: string[]) {
     if (personIds.length === 0) return
@@ -555,6 +579,9 @@ export default function App() {
             people={db.people}
             onNovaPessoa={() => setSheet({ mode: 'pessoa' })}
             onEditar={(p) => setSheet({ mode: 'pessoa', person: p })}
+            onArquivar={archivePerson}
+            onReativar={reactivatePerson}
+            onExcluir={deletePerson}
           />
         ) : null}
 
