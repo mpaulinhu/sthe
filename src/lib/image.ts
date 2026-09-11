@@ -74,3 +74,40 @@ export async function compressImage(file: Blob): Promise<string> {
 export function dataUrlKb(dataUrl: string): number {
   return Math.round(dataUrl.length / 1024)
 }
+
+/** Maior lado de uma foto de perfil — quadrada, pequena, sem precisar de detalhe de print. */
+const AVATAR_SIDE = 240
+
+/** Orçamento bem menor que o de comprovante: dezenas de avatares vivem juntos nas listas. */
+const AVATAR_MAX_BYTES = 40 * 1024
+
+/**
+ * Lê um arquivo de imagem e devolve um data URL JPEG quadrado (recorte
+ * centrado) e pequeno — para foto de perfil, não para comprovante. Recortar
+ * já na compressão evita salvar uma foto retangular inteira e deixar o
+ * enquadramento redondo do avatar cortando ela de forma imprevisível.
+ */
+export async function compressAvatar(file: Blob): Promise<string> {
+  const img = await loadImage(file)
+  const lado = Math.min(img.naturalWidth, img.naturalHeight)
+  const sx = (img.naturalWidth - lado) / 2
+  const sy = (img.naturalHeight - lado) / 2
+  const tamanho = Math.min(AVATAR_SIDE, lado)
+
+  const canvas = document.createElement('canvas')
+  canvas.width = tamanho
+  canvas.height = tamanho
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Não consegui processar essa imagem.')
+
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, tamanho, tamanho)
+  ctx.drawImage(img, sx, sy, lado, lado, 0, 0, tamanho, tamanho)
+
+  for (const q of QUALITIES) {
+    const url = canvas.toDataURL('image/jpeg', q)
+    if (url.length <= AVATAR_MAX_BYTES) return url
+  }
+
+  throw new Error('Essa imagem é pesada demais. Tente outra foto.')
+}

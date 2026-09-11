@@ -8,6 +8,7 @@ import {
   type Person,
 } from '../lib/types'
 import { formatMoney, payDayLabel } from '../lib/calc'
+import { Avatar } from '../components/Avatar'
 
 const TIPOS: { id: ContractType | 'todos'; label: string }[] = [
   { id: 'todos', label: 'Todo mundo' },
@@ -15,15 +16,6 @@ const TIPOS: { id: ContractType | 'todos'; label: string }[] = [
   { id: 'diarista', label: 'Diaristas' },
   { id: 'freelancer', label: 'Freelas' },
 ]
-
-function initials(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? '')
-    .join('')
-}
 
 /**
  * Banco de cadastro: todo mundo que já trabalhou ou trabalha, independente de
@@ -203,12 +195,7 @@ function PersonCard({
       style={{ ['--i' as string]: index }}
     >
       <button onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3.5 text-left">
-        <span
-          className={`flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full text-[13px] font-semibold ring-4 ${CONTRACT_AVATAR[person.contract]}`}
-          aria-hidden
-        >
-          {initials(person.name)}
-        </span>
+        <Avatar person={person} tone={CONTRACT_AVATAR[person.contract]} />
 
         <div className="min-w-0 flex-1">
           <h3 className="font-display text-[17px] font-semibold leading-tight">{person.name}</h3>

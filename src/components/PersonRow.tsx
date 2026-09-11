@@ -8,15 +8,7 @@ import {
   type Entry,
   type Receipt,
 } from '../lib/types'
-
-function initials(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? '')
-    .join('')
-}
+import { Avatar } from './Avatar'
 
 /** Cor do anel do avatar conforme a situação — dá leitura de status à distância. */
 const AVATAR_RING = {
@@ -171,12 +163,7 @@ export function PersonRow({
           </p>
         </div>
 
-        <span
-          className={`flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full text-[13px] font-semibold ring-4 transition-transform duration-300 group-hover:scale-105 ${tomAvatar}`}
-          aria-hidden
-        >
-          {initials(person.name)}
-        </span>
+        <Avatar person={person} tone={tomAvatar} />
 
         <div className="min-w-0 flex-1 basis-[45%] sm:basis-auto">
           <h3 className="font-display text-[19px] font-semibold leading-tight">{person.name}</h3>

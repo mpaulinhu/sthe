@@ -13,6 +13,8 @@ import {
 } from '../lib/types'
 import { uid } from '../lib/storage'
 import { isValidCpf, maskCpf, onlyDigits } from '../lib/receipt'
+import { compressAvatar } from '../lib/image'
+import { initials } from './Avatar'
 
 const CONTRACTS: { id: ContractType; label: string }[] = [
   { id: 'fixo', label: CONTRACT_SHORT.fixo },
@@ -69,9 +71,23 @@ export function PersonSheet({
   const [method, setMethod] = useState<PaymentMethod>(initial?.method ?? 'Pix')
   const [doc, setDoc] = useState(initial?.doc ? maskCpf(initial.doc) : '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
+  const [photo, setPhoto] = useState(initial?.photo ?? '')
+  const [carregandoFoto, setCarregandoFoto] = useState(false)
 
   const docLimpo = onlyDigits(doc)
   const docErrado = docLimpo.length === 11 && !isValidCpf(docLimpo)
+
+  async function escolherFoto(file: File | undefined) {
+    if (!file) return
+    setCarregandoFoto(true)
+    try {
+      setPhoto(await compressAvatar(file))
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Não consegui usar essa foto.')
+    } finally {
+      setCarregandoFoto(false)
+    }
+  }
 
   const diaDigitado = Math.min(31, Math.max(1, Number(payDay) || 5))
 
@@ -107,6 +123,7 @@ export function PersonSheet({
       payDayMode,
       method,
       doc: docLimpo || undefined,
+      photo: photo || undefined,
       active: initial?.active ?? true,
       notes: notes.trim(),
       createdAt: initial?.createdAt ?? new Date().toISOString(),
@@ -135,16 +152,73 @@ export function PersonSheet({
         </>
       }
     >
-      <label className="flex flex-col gap-[7px]">
-        <Label>Nome</Label>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="ex: Ana Paula Ribeiro"
-          className={fieldClass}
-          autoFocus
-        />
-      </label>
+      {/* Foto ao lado do nome: é a identidade da pessoa, e junto do campo que
+          a nomeia fica óbvio a quem ela pertence — além de aproveitar a
+          largura que o campo de nome sozinho desperdiçaria. */}
+      <div className="flex items-end gap-3.5">
+        <div className="flex shrink-0 flex-col items-center gap-1.5">
+          <label
+            className={`relative flex h-[62px] w-[62px] items-center justify-center overflow-hidden rounded-full ring-4 ring-blush-200/50 transition-colors ${
+              carregandoFoto ? 'cursor-wait opacity-60' : 'cursor-pointer'
+            } ${photo ? '' : 'border border-dashed border-line bg-cream hover:border-butterfly-200 hover:bg-butterfly-50'}`}
+          >
+            {photo ? (
+              <img src={photo} alt="" aria-hidden className="h-full w-full object-cover" />
+            ) : name.trim() ? (
+              <span className="text-[17px] font-semibold text-blush-600">
+                {initials(name)}
+              </span>
+            ) : (
+              <svg
+                viewBox="0 0 20 20"
+                className="h-5 w-5 text-ink-faint"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <circle cx="10" cy="7" r="3" />
+                <path d="M4 16.5c0-2.8 2.7-4.5 6-4.5s6 1.7 6 4.5" />
+              </svg>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={carregandoFoto}
+              onChange={(e) => {
+                void escolherFoto(e.target.files?.[0])
+                e.target.value = ''
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => (photo ? setPhoto('') : undefined)}
+            className={`text-[11.5px] transition-colors ${
+              photo
+                ? 'text-ink-faint hover:text-late hover:underline'
+                : 'cursor-default text-ink-dim'
+            }`}
+            disabled={!photo}
+          >
+            {carregandoFoto ? 'carregando…' : photo ? 'remover' : 'foto'}
+          </button>
+        </div>
+
+        <label className="flex min-w-0 flex-1 flex-col gap-[7px] pb-[22px]">
+          <Label>Nome</Label>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="ex: Ana Paula Ribeiro"
+            className={fieldClass}
+            autoFocus
+          />
+        </label>
+      </div>
 
       <label className="flex flex-col gap-[7px]">
         <Label>Função</Label>

@@ -38,6 +38,11 @@ export interface Person {
    * recibo perde boa parte do valor probatório.
    */
   doc?: string
+  /**
+   * Foto de perfil (data URL JPEG, já recortada em quadrado e comprimida por
+   * `compressAvatar`). Opcional: sem foto, o avatar mostra as iniciais do nome.
+   */
+  photo?: string
   active: boolean
   /** Quando ela deixou de trabalhar aqui — só existe se `active` for false. */
   inactivatedAt?: string
