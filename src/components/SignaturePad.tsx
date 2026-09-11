@@ -23,6 +23,8 @@ export function SignaturePad({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const desenhando = useRef(false)
   const ultimo = useRef<{ x: number; y: number } | null>(null)
+  /** Escala aplicada ao contexto (o `devicePixelRatio` do último setup). */
+  const escala = useRef(1)
   const [temTraco, setTemTraco] = useState(false)
 
   /**
@@ -51,9 +53,14 @@ export function SignaturePad({
 
       canvas.width = w
       canvas.height = h
+      // `setTransform` e não `scale`: `scale` multiplica o que já existe, então
+      // um segundo setup deixaria a escala em 9 num aparelho de dpr 3 e o traço
+      // sairia longe do dedo. `setTransform` define o valor absoluto, e por
+      // isso pode ser chamado quantas vezes for.
+      escala.current = dpr
       const ctx = canvas.getContext('2d')
       if (!ctx) return
-      ctx.scale(dpr, dpr)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.lineWidth = 2.2
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
@@ -121,8 +128,14 @@ export function SignaturePad({
     const contexto = () => {
       const ctx = canvas.getContext('2d')
       if (!ctx) return null
-      // O contexto zera quando o canvas é redimensionado; reafirmar aqui custa
-      // nada e evita um traço fino e preto-puro depois de girar o aparelho.
+      // Reafirma tudo a cada traço. Redimensionar o canvas zera o contexto —
+      // inclusive a escala — e isso acontece por fora daqui (o painel rola, a
+      // barra do navegador some, o `ResizeObserver` dispara). Sem a escala
+      // reaplicada o desenho sai num canto minúsculo, e a assinatura parece
+      // não estar acontecendo quando na verdade está: o traço existe, só é
+      // pequeno demais para ser visto.
+      const dpr = escala.current
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.lineWidth = 2.2
       ctx.lineCap = 'round'
       ctx.lineJoin = 'round'
@@ -216,8 +229,21 @@ export function SignaturePad({
   return (
     <div className="flex flex-col gap-2">
       <div
+        /**
+         * Fundo claro fixo, mesmo no modo escuro.
+         *
+         * `bg-white` e `bg-cream` são variáveis que o tema escuro redefine —
+         * é o que faz a interface inteira escurecer de uma vez. Aqui isso era
+         * um bug sério: a tinta da assinatura é escura (tem que ser, o PNG vai
+         * para um recibo de fundo branco), então no modo escuro a pessoa
+         * assinava preto sobre preto e concluía que o campo não funcionava.
+         *
+         * Este é o único lugar da interface que não acompanha o tema, e é de
+         * propósito: aqui o quadro representa papel.
+         */
+        style={{ backgroundColor: '#fdfcfb' }}
         className={`relative overflow-hidden rounded-[14px] border-2 border-dashed transition-colors ${
-          temTraco ? 'border-butterfly-200 bg-white' : 'border-line bg-cream'
+          temTraco ? 'border-butterfly-400' : 'border-line'
         }`}
       >
         <canvas
@@ -238,8 +264,13 @@ export function SignaturePad({
             morta, sem nada na própria tela explicando o que faltava. */}
         {!temTraco ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-[38px] flex flex-col items-center gap-2 px-8">
-            <div className="h-px w-full bg-line" />
-            <span className="text-center text-[12px] leading-snug text-ink-dim">
+            {/* Cores fixas como o fundo: as do tema sumiriam sobre o branco
+                no modo escuro, pelo mesmo motivo que a tinta sumia. */}
+            <div className="h-px w-full" style={{ backgroundColor: '#e0d7da' }} />
+            <span
+              className="text-center text-[12px] leading-snug"
+              style={{ color: '#9b8f96' }}
+            >
               {disabled ? 'Preencha o CPF acima para liberar a assinatura' : 'Assine aqui com o dedo'}
             </span>
           </div>
