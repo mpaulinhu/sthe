@@ -6,6 +6,7 @@ import {
   KIND_EFFECT,
   KIND_LABEL,
   type Entry,
+  type Person,
   type Receipt,
 } from '../lib/types'
 import { Avatar } from './Avatar'
@@ -32,6 +33,7 @@ export function PersonRow({
   onToggleEntry,
   onVerRecibo,
   onVerComprovante,
+  onVerFoto,
   onAssinarDepois,
 }: {
   summary: PersonSummary
@@ -52,6 +54,7 @@ export function PersonRow({
   onToggleEntry: (entry: Entry) => void
   onVerRecibo?: (r: Receipt) => void
   onVerComprovante?: (entry: Entry) => void
+  onVerFoto?: (p: Person) => void
   /** Reconhecer o recebimento depois de já ter marcado como pago sem assinar na hora. */
   onAssinarDepois?: (entry: Entry) => void
 }) {
@@ -163,7 +166,11 @@ export function PersonRow({
           </p>
         </div>
 
-        <Avatar person={person} tone={tomAvatar} />
+        <Avatar
+          person={person}
+          tone={tomAvatar}
+          onVerFoto={onVerFoto ? () => onVerFoto(person) : undefined}
+        />
 
         <div className="min-w-0 flex-1 basis-[45%] sm:basis-auto">
           <h3 className="font-display text-[19px] font-semibold leading-tight">{person.name}</h3>

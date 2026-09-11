@@ -6,6 +6,7 @@ import { ValueSheet, type ValueResult } from './components/ValueSheet'
 import { SignSheet, type SignResult } from './components/SignSheet'
 import { ReceiptSheet } from './components/ReceiptSheet'
 import { ProofSheet } from './components/ProofSheet'
+import { FotoSheet } from './components/FotoSheet'
 import { Toast } from './components/Toast'
 import { DemoNotice } from './components/DemoNotice'
 import { EquipePage } from './pages/EquipePage'
@@ -72,6 +73,7 @@ type SheetState =
     }
   | { mode: 'recibo'; recibo: Receipt }
   | { mode: 'comprovante'; entry: Entry }
+  | { mode: 'foto'; person: Person }
   | null
 
 export default function App() {
@@ -769,6 +771,7 @@ export default function App() {
             onArquivar={archivePerson}
             onReativar={reactivatePerson}
             onExcluir={deletePerson}
+            onVerFoto={(person) => setSheet({ mode: 'foto', person })}
           />
         ) : null}
 
@@ -806,6 +809,7 @@ export default function App() {
             onToggleEntry={toggleEntry}
             onVerRecibo={(recibo) => setSheet({ mode: 'recibo', recibo })}
             onVerComprovante={(entry) => setSheet({ mode: 'comprovante', entry })}
+            onVerFoto={(person) => setSheet({ mode: 'foto', person })}
             onAssinarDepois={assinarDepois}
           />
         ) : null}
@@ -958,6 +962,10 @@ export default function App() {
 
       {sheet?.mode === 'comprovante' ? (
         <ProofSheet entry={sheet.entry} onClose={() => setSheet(null)} />
+      ) : null}
+
+      {sheet?.mode === 'foto' ? (
+        <FotoSheet person={sheet.person} onClose={() => setSheet(null)} />
       ) : null}
 
       <Toast message={toast} onDone={() => setToast('')} />

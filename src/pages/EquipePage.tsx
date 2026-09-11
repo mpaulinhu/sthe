@@ -32,6 +32,7 @@ export function EquipePage({
   onArquivar,
   onReativar,
   onExcluir,
+  onVerFoto,
 }: {
   people: Person[]
   onNovaPessoa: () => void
@@ -39,6 +40,7 @@ export function EquipePage({
   onArquivar: (id: string) => void
   onReativar: (id: string) => void
   onExcluir: (id: string) => void
+  onVerFoto: (p: Person) => void
 }) {
   const [tipo, setTipo] = useState<ContractType | 'todos'>('todos')
 
@@ -130,6 +132,7 @@ export function EquipePage({
                 onEditar={() => onEditar(p)}
                 onArquivar={() => onArquivar(p.id)}
                 onExcluir={() => onExcluir(p.id)}
+                onVerFoto={() => onVerFoto(p)}
               />
             ))}
           </div>
@@ -159,6 +162,7 @@ export function EquipePage({
                     onEditar={() => onEditar(p)}
                     onReativar={() => onReativar(p.id)}
                     onExcluir={() => onExcluir(p.id)}
+                    onVerFoto={() => onVerFoto(p)}
                     inativo
                   />
                 ))}
@@ -179,6 +183,7 @@ function PersonCard({
   onArquivar,
   onReativar,
   onExcluir,
+  onVerFoto,
   inativo,
 }: {
   person: Person
@@ -188,6 +193,7 @@ function PersonCard({
   onArquivar?: () => void
   onReativar?: () => void
   onExcluir: () => void
+  onVerFoto: () => void
   inativo?: boolean
 }) {
   // O menu vive aqui, e não dentro do próprio menu, porque é o card que
@@ -204,7 +210,11 @@ function PersonCard({
       style={{ ['--i' as string]: index }}
     >
       <button onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3.5 text-left">
-        <Avatar person={person} tone={CONTRACT_AVATAR[person.contract]} />
+        <Avatar
+          person={person}
+          tone={CONTRACT_AVATAR[person.contract]}
+          onVerFoto={onVerFoto}
+        />
 
         <div className="min-w-0 flex-1">
           <h3 className="font-display text-[17px] font-semibold leading-tight">{person.name}</h3>

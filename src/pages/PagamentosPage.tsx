@@ -76,6 +76,7 @@ export function PagamentosPage({
   onToggleEntry,
   onVerRecibo,
   onVerComprovante,
+  onVerFoto,
   onAssinarDepois,
 }: {
   db: Database
@@ -110,6 +111,7 @@ export function PagamentosPage({
   onToggleEntry: (e: Entry) => void
   onVerRecibo: (r: Receipt) => void
   onVerComprovante: (e: Entry) => void
+  onVerFoto: (p: Person) => void
   onAssinarDepois: (p: Person, e: Entry) => void
 }) {
   // Cadastro vazio de verdade (nunca cadastrou ninguém) é diferente de "mês
@@ -474,6 +476,7 @@ export function PagamentosPage({
                           )}
                           onVerRecibo={onVerRecibo}
                           onVerComprovante={onVerComprovante}
+                          onVerFoto={onVerFoto}
                           onAssinarDepois={(e) => onAssinarDepois(s.person, e)}
                         />
                       ))}

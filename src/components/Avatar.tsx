@@ -23,19 +23,55 @@ export function Avatar({
   person,
   tone,
   className = 'h-[40px] w-[40px] text-[13px]',
+  onVerFoto,
 }: {
   person: Pick<Person, 'name' | 'photo'>
   tone: string
   className?: string
+  /** Quando passado e a pessoa tem foto, clicar abre a imagem ampliada. */
+  onVerFoto?: () => void
 }) {
   if (person.photo) {
     const anel = tone.split(' ').find((c) => c.startsWith('ring-')) ?? 'ring-blush-200/50'
+    const classes = `shrink-0 rounded-full object-cover ring-4 ${anel} ${className}`
+
+    if (!onVerFoto) {
+      return <img src={person.photo} alt="" aria-hidden className={classes} />
+    }
+
+    /**
+     * `role="button"` num `<img>` em vez de embrulhar num `<button>`: nas duas
+     * telas o avatar já vive dentro de um botão (que abre o cadastro), e botão
+     * dentro de botão é HTML inválido — o navegador desmonta o aninhamento e o
+     * clique de fora para de funcionar.
+     *
+     * `stopPropagation` é o que separa os dois gestos: sem ele, clicar na foto
+     * abriria a imagem E o cadastro atrás dela.
+     */
     return (
       <img
         src={person.photo}
-        alt=""
-        aria-hidden
-        className={`shrink-0 rounded-full object-cover ring-4 ${anel} ${className}`}
+        alt={`Foto de ${person.name}`}
+        role="button"
+        tabIndex={0}
+        title="Ver foto"
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          // Três barreiras porque uma só não segura: o avatar vive dentro do
+          // botão que abre o cadastro, e sem parar já no `pointerdown`/
+          // `mousedown` o clique chega ao pai e as duas telas abrem juntas.
+          e.stopPropagation()
+          e.preventDefault()
+          onVerFoto()
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return
+          e.preventDefault()
+          e.stopPropagation()
+          onVerFoto()
+        }}
+        className={`${classes} cursor-zoom-in transition-transform duration-300 hover:scale-105`}
       />
     )
   }
