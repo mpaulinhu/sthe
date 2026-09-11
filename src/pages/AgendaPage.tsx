@@ -13,17 +13,20 @@ import {
 import { digitsToTimeRange } from '../lib/timeRange'
 import type { AgendaItem, Person } from '../lib/types'
 import { uid } from '../lib/storage'
+import { ATRIBUTO_DIA, useArrastar } from '../lib/useArrastar'
 
 export function AgendaPage({
   agenda,
   people,
   onSave,
+  onMove,
   onDelete,
   onError,
 }: {
   agenda: AgendaItem[]
   people: Person[]
   onSave: (s: AgendaItem) => void
+  onMove: (id: string, date: string, duplicar: boolean) => void
   onDelete: (id: string) => void
   onError: (msg: string) => void
 }) {
@@ -57,6 +60,8 @@ export function AgendaPage({
     const fmt = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
     return `${fmt(ini)} — ${fmt(fim)}`
   }, [dias, modo, ancora])
+
+  const { arrasto, comecar } = useArrastar(onMove)
 
   function andar(passo: -1 | 1) {
     setAncora((atual) =>
@@ -135,7 +140,9 @@ export function AgendaPage({
           hoje={hoje}
           mesAncora={mesAncora}
           people={people}
+          arrasto={arrasto}
           onAbrir={(item, date) => setEditando({ item, date })}
+          onComecar={comecar}
         />
         <div className="hidden sm:block">
           <div>
@@ -158,8 +165,11 @@ export function AgendaPage({
                   itens={agendaOfDay(agenda, dia)}
                   ehHoje={dia === hoje}
                   doMes={dia.slice(0, 7) === mesAncora}
+                  alvo={arrasto?.alvo === dia}
+                  idArrastando={arrasto?.id}
                   onAbrir={(item) => setEditando({ item, date: dia })}
                   onAdicionar={() => setEditando({ date: dia })}
+                  onComecar={comecar}
                 />
               ))}
             </div>
@@ -176,9 +186,12 @@ export function AgendaPage({
           return (
             <div
               key={dia}
+              {...{ [ATRIBUTO_DIA]: dia }}
               className={`rise-in flex min-h-[168px] flex-col rounded-2xl lg:rounded-none ${
                 ehHoje ? 'bg-blush-50' : fimDeSemana ? 'bg-surface-sunken' : 'bg-white'
-              } ${ehHoje ? 'ring-1 ring-inset ring-blush-200 lg:ring-0' : 'border border-blush-100 lg:border-0'}`}
+              } ${ehHoje ? 'ring-1 ring-inset ring-blush-200 lg:ring-0' : 'border border-blush-100 lg:border-0'} ${
+                arrasto?.alvo === dia ? 'ring-2 ring-inset ring-blush-400' : ''
+              }`}
               style={{ ['--i' as string]: i }}
             >
               <div
@@ -204,10 +217,13 @@ export function AgendaPage({
 
               <div className="flex flex-1 flex-col gap-2 px-2.5 pb-2.5">
                 {doDia.map((it) => (
-                  <button
+                  <ItemArrastavel
                     key={it.id}
-                    onClick={() => setEditando({ item: it, date: dia })}
-                    className="rounded-lg border-l-2 border-blush-400 bg-blush-50/60 py-1.5 pl-2.5 pr-2 text-left transition-colors hover:bg-blush-50"
+                    item={it}
+                    dia={dia}
+                    arrastando={arrasto?.id === it.id}
+                    onAbrir={() => setEditando({ item: it, date: dia })}
+                    onComecar={comecar}
                   >
                     {it.time ? (
                       <p className="text-[11.5px] font-semibold tabular-nums text-blush-600">
@@ -223,7 +239,7 @@ export function AgendaPage({
                           .join(', ')}
                       </p>
                     ) : null}
-                  </button>
+                  </ItemArrastavel>
                 ))}
 
                 {/* Discreto mas sempre presente: esconder atrás de hover
@@ -242,12 +258,27 @@ export function AgendaPage({
       </div>
       )}
 
+      {temAlgo ? (
+        <p className="mt-3 hidden text-center text-[12px] text-ink-dim sm:block">
+          Arraste um item para mudar de dia. Segure Alt ao soltar para deixar uma cópia.
+        </p>
+      ) : null}
+
       {!temAlgo ? (
         <p className="mt-5 text-center text-[13px] text-ink-faint">
           {modo === 'semana'
             ? 'Nada nesta semana. Clique em “+ item” num dia para anotar um turno ou um compromisso.'
             : 'Nada neste mês. Clique num dia para anotar um turno ou um compromisso.'}
         </p>
+      ) : null}
+
+      {arrasto ? (
+        <Fantasma
+          titulo={agenda.find((it) => it.id === arrasto.id)?.title ?? ''}
+          x={arrasto.x}
+          y={arrasto.y}
+          duplicando={arrasto.duplicando}
+        />
       ) : null}
 
       {editando ? (
@@ -276,6 +307,73 @@ export function AgendaPage({
 }
 
 /**
+ * O bloquinho de um compromisso. Arrastável nos três lugares onde aparece
+ * (semana, grade do mês, lista do mês), com o mesmo comportamento.
+ *
+ * `touch-none` é o que faz o gesto existir no celular: sem isso o navegador
+ * entende o arrasto como rolagem e o item nunca se move.
+ */
+function ItemArrastavel({
+  item,
+  dia,
+  arrastando,
+  compacto,
+  children,
+  onAbrir,
+  onComecar,
+}: {
+  item: AgendaItem
+  dia: string
+  arrastando: boolean
+  compacto?: boolean
+  children: React.ReactNode
+  onAbrir: () => void
+  onComecar: (e: React.PointerEvent, id: string, origem: string) => void
+}) {
+  return (
+    <button
+      onPointerDown={(e) => onComecar(e, item.id, dia)}
+      onClick={onAbrir}
+      title={[item.time, item.title].filter(Boolean).join(' · ')}
+      className={`touch-none select-none rounded-lg border-l-2 border-blush-400 bg-blush-50/60 text-left transition-colors hover:bg-blush-50 ${
+        compacto ? 'rounded py-[3px] pl-1.5 pr-1' : 'py-1.5 pl-2.5 pr-2'
+      } ${arrastando ? 'opacity-40' : ''}`}
+    >
+      {children}
+    </button>
+  )
+}
+
+/**
+ * O que segue o dedo durante o arrasto.
+ *
+ * Fica preso ao ponteiro com `position: fixed` e `pointer-events: none` — sem
+ * isso ele próprio viraria o alvo de `elementFromPoint` e o dia de destino
+ * nunca seria encontrado.
+ */
+function Fantasma({
+  titulo,
+  x,
+  y,
+  duplicando,
+}: {
+  titulo: string
+  x: number
+  y: number
+  duplicando: boolean
+}) {
+  return (
+    <div
+      className="pointer-events-none fixed z-50 max-w-[220px] truncate rounded-lg border border-blush-300 bg-white px-2.5 py-1.5 text-[12.5px] shadow-lift"
+      style={{ left: x + 12, top: y + 12 }}
+    >
+      {duplicando ? <span className="mr-1 font-semibold text-blush-600">+</span> : null}
+      {titulo}
+    </div>
+  )
+}
+
+/**
  * O mês no celular: só os dias que têm algo, em lista.
  *
  * Uma grade de 7 colunas numa tela de 390px daria células de ~50px — não cabe
@@ -292,14 +390,18 @@ function ListaMes({
   hoje,
   mesAncora,
   people,
+  arrasto,
   onAbrir,
+  onComecar,
 }: {
   dias: string[]
   agenda: AgendaItem[]
   hoje: string
   mesAncora: string
   people: Person[]
+  arrasto: { id: string; alvo: string | null } | null
   onAbrir: (item: AgendaItem, date: string) => void
+  onComecar: (e: React.PointerEvent, id: string, origem: string) => void
 }) {
   // Só os dias do mês em foco: os vizinhos que completam a grade apareceriam
   // aqui como "31 de agosto" no meio da lista de setembro, sem contexto.
@@ -317,9 +419,10 @@ function ListaMes({
         return (
           <div
             key={dia}
+            {...{ [ATRIBUTO_DIA]: dia }}
             className={`rise-in overflow-hidden rounded-2xl border bg-white ${
               ehHoje ? 'border-blush-200 ring-1 ring-inset ring-blush-200' : 'border-blush-100'
-            }`}
+            } ${arrasto?.alvo === dia ? 'ring-2 ring-inset ring-blush-400' : ''}`}
             style={{ ['--i' as string]: i }}
           >
             <div
@@ -346,10 +449,13 @@ function ListaMes({
 
             <div className="flex flex-col gap-1.5 p-2.5">
               {itens.map((it) => (
-                <button
+                <ItemArrastavel
                   key={it.id}
-                  onClick={() => onAbrir(it, dia)}
-                  className="rounded-lg border-l-2 border-blush-400 bg-blush-50/60 py-1.5 pl-2.5 pr-2 text-left transition-colors hover:bg-blush-50"
+                  item={it}
+                  dia={dia}
+                  arrastando={arrasto?.id === it.id}
+                  onAbrir={() => onAbrir(it, dia)}
+                  onComecar={onComecar}
                 >
                   {it.time ? (
                     <p className="text-[11.5px] font-semibold tabular-nums text-blush-600">
@@ -365,7 +471,7 @@ function ListaMes({
                         .join(', ')}
                     </p>
                   ) : null}
-                </button>
+                </ItemArrastavel>
               ))}
             </div>
           </div>
@@ -388,16 +494,22 @@ function CelulaMes({
   itens,
   ehHoje,
   doMes,
+  alvo,
+  idArrastando,
   onAbrir,
   onAdicionar,
+  onComecar,
 }: {
   dia: string
   indice: number
   itens: AgendaItem[]
   ehHoje: boolean
   doMes: boolean
+  alvo: boolean
+  idArrastando?: string
   onAbrir: (item: AgendaItem) => void
   onAdicionar: () => void
+  onComecar: (e: React.PointerEvent, id: string, origem: string) => void
 }) {
   const VISIVEIS = 3
   const sobra = itens.length - VISIVEIS
@@ -405,9 +517,10 @@ function CelulaMes({
 
   return (
     <div
+      {...{ [ATRIBUTO_DIA]: dia }}
       className={`rise-in flex min-h-[104px] flex-col ${
         ehHoje ? 'bg-blush-50' : doMes ? 'bg-white' : 'bg-surface-sunken'
-      }`}
+      } ${alvo ? 'ring-2 ring-inset ring-blush-400' : ''}`}
       style={{ ['--i' as string]: indice % 7 }}
     >
       <div className="flex items-center justify-between px-2 pt-1.5">
@@ -435,11 +548,14 @@ function CelulaMes({
 
       <div className="flex flex-1 flex-col gap-0.5 px-1.5 pb-1.5 pt-1">
         {mostrados.map((it) => (
-          <button
+          <ItemArrastavel
             key={it.id}
-            onClick={() => onAbrir(it)}
-            title={[it.time, it.title].filter(Boolean).join(' · ')}
-            className="rounded border-l-2 border-blush-400 bg-blush-50/70 py-[3px] pl-1.5 pr-1 text-left transition-colors hover:bg-blush-100"
+            item={it}
+            dia={dia}
+            arrastando={idArrastando === it.id}
+            compacto
+            onAbrir={() => onAbrir(it)}
+            onComecar={onComecar}
           >
             <p className="truncate text-[11px] leading-tight">
               {it.time ? (
@@ -449,7 +565,7 @@ function CelulaMes({
               ) : null}
               {it.title}
             </p>
-          </button>
+          </ItemArrastavel>
         ))}
 
         {sobra > 0 ? (

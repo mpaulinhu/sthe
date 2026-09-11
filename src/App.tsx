@@ -551,6 +551,27 @@ export default function App() {
     flash(editando ? 'Item atualizado.' : 'Item adicionado à agenda.')
   }
 
+  /**
+   * Arrastar um item para outro dia — e, com Alt, deixar uma cópia.
+   *
+   * Separado do `upsert` por causa do aviso: arrastar é gesto contínuo, e
+   * "Item atualizado" a cada solta viraria ruído. Aqui a mensagem diz o que
+   * de fato aconteceu, e some sozinha.
+   */
+  function moverAgendaItem(id: string, date: string, duplicar: boolean) {
+    setDb((d) => {
+      const item = d.agenda.find((it) => it.id === id)
+      if (!item || item.date === date) return d
+      return {
+        ...d,
+        agenda: duplicar
+          ? [...d.agenda, { ...item, id: uid(), date, createdAt: new Date().toISOString() }]
+          : d.agenda.map((it) => (it.id === id ? { ...it, date } : it)),
+      }
+    })
+    flash(duplicar ? 'Item copiado.' : 'Item movido.')
+  }
+
   function deleteAgendaItem(id: string) {
     setDb((d) => ({ ...d, agenda: d.agenda.filter((it) => it.id !== id) }))
     flash('Item excluído.')
@@ -728,6 +749,7 @@ export default function App() {
             agenda={db.agenda}
             people={peopleAtivos}
             onSave={upsertAgendaItem}
+            onMove={moverAgendaItem}
             onDelete={deleteAgendaItem}
             onError={flash}
           />
