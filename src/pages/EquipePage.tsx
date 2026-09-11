@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { PageHeader, PlusIcon, PrimaryButton, Vazio } from '../components/Shell'
 import {
   CONTRACT_AVATAR,
@@ -9,9 +9,7 @@ import {
 } from '../lib/types'
 import { formatMoney, payDayLabel } from '../lib/calc'
 import { Avatar } from '../components/Avatar'
-
-/** Altura aproximada do menu de ações — usada só para decidir o lado que abre. */
-const ALTURA_MENU = 180
+import { ItemMenu, MenuAcoes, SeparadorMenu } from '../components/MenuAcoes'
 
 const TIPOS: { id: ContractType | 'todos'; label: string }[] = [
   { id: 'todos', label: 'Todo mundo' },
@@ -272,118 +270,44 @@ function PersonCardMenu({
   onReativar?: () => void
   onExcluir: () => void
 }) {
-  const ref = useRef<HTMLDivElement>(null)
-
-  /** Abre para cima quando não há espaço abaixo — o último card da lista. */
-  const [paraCima, setParaCima] = useState(false)
-
-  useEffect(() => {
-    if (!aberto) return
-    function onFora(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setAberto(false)
-    }
-    function onEsc(e: KeyboardEvent) {
-      if (e.key === 'Escape') setAberto(false)
-    }
-    document.addEventListener('mousedown', onFora)
-    document.addEventListener('keydown', onEsc)
-    return () => {
-      document.removeEventListener('mousedown', onFora)
-      document.removeEventListener('keydown', onEsc)
-    }
-  }, [aberto, setAberto])
-
-  function alternar() {
-    // Mede antes de abrir: no último card da lista o menu sairia pela borda
-    // de baixo da janela, e a pessoa não conseguiria clicar em "Excluir".
-    if (!aberto && ref.current) {
-      const { bottom } = ref.current.getBoundingClientRect()
-      setParaCima(window.innerHeight - bottom < ALTURA_MENU)
-    }
-    setAberto(!aberto)
-  }
-
   return (
-    <div ref={ref} className="relative shrink-0">
-      <button
-        onClick={alternar}
-        aria-label={`Mais ações para ${person.name}`}
-        aria-expanded={aberto}
-        className="flex h-8 w-8 items-center justify-center rounded-[10px] text-ink-dim transition-colors hover:bg-blush-50 hover:text-blush-500"
-      >
-        <svg viewBox="0 0 16 16" className="h-[17px] w-[17px]" fill="currentColor" aria-hidden>
-          <circle cx="8" cy="3" r="1.4" />
-          <circle cx="8" cy="8" r="1.4" />
-          <circle cx="8" cy="13" r="1.4" />
-        </svg>
-      </button>
+    <MenuAcoes rotulo={person.name} aberto={aberto} setAberto={setAberto}>
+      <ItemMenu onClick={onEditar}>Editar</ItemMenu>
 
-      {aberto ? (
-        <div
-          role="menu"
-          className={`absolute right-0 z-10 w-[184px] overflow-hidden rounded-[14px] border border-blush-100 bg-white py-1.5 shadow-lift [animation:fadeIn_.15s_ease] ${
-            paraCima ? 'bottom-[calc(100%+4px)]' : 'top-[calc(100%+4px)]'
-          }`}
+      {!inativo && onArquivar ? (
+        <ItemMenu
+          onClick={() => {
+            if (window.confirm(`Tirar ${person.name} da lista? O histórico continua salvo.`)) {
+              onArquivar()
+            }
+          }}
         >
-          <button
-            role="menuitem"
-            onClick={() => {
-              setAberto(false)
-              onEditar()
-            }}
-            className="flex w-full items-center px-3.5 py-2.5 text-left text-[13.5px] text-ink-soft transition-colors hover:bg-blush-50"
-          >
-            Editar
-          </button>
-
-          {!inativo && onArquivar ? (
-            <button
-              role="menuitem"
-              onClick={() => {
-                setAberto(false)
-                if (window.confirm(`Tirar ${person.name} da lista? O histórico continua salvo.`)) {
-                  onArquivar()
-                }
-              }}
-              className="flex w-full items-center px-3.5 py-2.5 text-left text-[13.5px] text-ink-soft transition-colors hover:bg-blush-50"
-            >
-              Não trabalha mais aqui
-            </button>
-          ) : null}
-
-          {inativo && onReativar ? (
-            <button
-              role="menuitem"
-              onClick={() => {
-                setAberto(false)
-                onReativar()
-              }}
-              className="flex w-full items-center px-3.5 py-2.5 text-left text-[13.5px] text-butterfly-600 transition-colors hover:bg-blush-50"
-            >
-              Voltou a trabalhar aqui
-            </button>
-          ) : null}
-
-          <div className="my-1 h-px bg-hair" />
-
-          <button
-            role="menuitem"
-            onClick={() => {
-              setAberto(false)
-              if (
-                window.confirm(
-                  `Excluir ${person.name} para sempre? Isso apaga o cadastro, os lançamentos e os recibos dela. Não dá para desfazer.`,
-                )
-              ) {
-                onExcluir()
-              }
-            }}
-            className="flex w-full items-center px-3.5 py-2.5 text-left text-[13.5px] font-medium text-late transition-colors hover:bg-late-soft"
-          >
-            Excluir
-          </button>
-        </div>
+          Não trabalha mais aqui
+        </ItemMenu>
       ) : null}
-    </div>
+
+      {inativo && onReativar ? (
+        <ItemMenu destaque onClick={onReativar}>
+          Voltou a trabalhar aqui
+        </ItemMenu>
+      ) : null}
+
+      <SeparadorMenu />
+
+      <ItemMenu
+        perigo
+        onClick={() => {
+          if (
+            window.confirm(
+              `Excluir ${person.name} para sempre? Isso apaga o cadastro, os lançamentos e os recibos dela. Não dá para desfazer.`,
+            )
+          ) {
+            onExcluir()
+          }
+        }}
+      >
+        Excluir
+      </ItemMenu>
+    </MenuAcoes>
   )
 }

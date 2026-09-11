@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Panel } from './Shell'
+import { ItemMenu, MenuAcoes, SeparadorMenu } from './MenuAcoes'
 import { Label, fieldClass } from './Sheet'
 import {
   completarMinhaEntrada,
@@ -383,38 +384,34 @@ function ListaPanel({
                     ) : null}
                   </div>
 
-                  <div className="flex shrink-0 gap-2">
-                    {renomeando === acesso.uid ? null : (
-                      <button
-                        type="button"
+                  {/* Enquanto renomeia o menu sai: os botões Salvar/Cancelar
+                      já ocupam esse canto, e duas saídas ao mesmo tempo
+                      confundem sobre o que está sendo confirmado. */}
+                  {renomeando === acesso.uid ? null : (
+                    <MenuAcoes rotulo={acesso.nome || email}>
+                      <ItemMenu
                         onClick={() => {
                           setRenomeando(acesso.uid)
                           setNomeNovo(acesso.nome || '')
                         }}
-                        className={botaoFino}
                       >
                         Renomear
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => void redefinir({ ...acesso, email })}
-                      disabled={travado}
-                      className={botaoFino}
-                    >
-                      Reenviar senha
-                    </button>
-                    {souEu ? null : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmando(acesso.uid)}
-                        disabled={travado}
-                        className={`${botaoFino} border-late/30 text-late hover:bg-late-soft`}
-                      >
-                        Remover
-                      </button>
-                    )}
-                  </div>
+                      </ItemMenu>
+
+                      <ItemMenu onClick={() => void redefinir({ ...acesso, email })}>
+                        Reenviar senha
+                      </ItemMenu>
+
+                      {souEu ? null : (
+                        <>
+                          <SeparadorMenu />
+                          <ItemMenu perigo onClick={() => setConfirmando(acesso.uid)}>
+                            Remover acesso
+                          </ItemMenu>
+                        </>
+                      )}
+                    </MenuAcoes>
+                  )}
                 </div>
 
                 {confirmando === acesso.uid ? (
