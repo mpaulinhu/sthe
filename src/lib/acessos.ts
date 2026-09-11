@@ -67,6 +67,35 @@ export async function contarAcessos(): Promise<number> {
 }
 
 /**
+ * Completa a própria entrada quando ela veio incompleta.
+ *
+ * Os primeiros acessos foram criados à mão no Console do Firebase, onde só o
+ * uid é obrigatório — esses documentos podem estar sem `nome` ou sem `email`,
+ * e a lista fica mostrando uma linha pela metade. Aqui a entrada de quem está
+ * logado é preenchida com o e-mail real da conta, que é a fonte certa.
+ *
+ * Só mexe na entrada do próprio usuário (é o único e-mail que temos como
+ * saber) e só no que está faltando: `merge` preserva o que já foi preenchido.
+ */
+export async function completarMinhaEntrada(
+  uid: string,
+  email: string,
+  atual: Acesso | undefined,
+): Promise<void> {
+  if (!email) return
+  const faltaEmail = !atual?.email
+  const faltaNome = !atual?.nome
+  if (!faltaEmail && !faltaNome) return
+
+  const remendo: Record<string, string> = {}
+  if (faltaEmail) remendo.email = email
+  // Sem nome, o trecho antes do @ é um palpite melhor do que deixar vazio.
+  if (faltaNome) remendo.nome = email.split('@')[0]
+
+  await setDoc(doc(colecao(), uid), remendo, { merge: true })
+}
+
+/**
  * Cria o login e já autoriza.
  *
  * O `createUserWithEmailAndPassword` troca a sessão ativa para a conta recém

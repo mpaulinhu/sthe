@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Panel } from './Shell'
 import { Label, fieldClass } from './Sheet'
 import {
+  completarMinhaEntrada,
   convidar,
   enviarRedefinicao,
   erroDeAcesso,
@@ -52,12 +53,24 @@ export function AcessosPanel({
 }) {
   const [lista, setLista] = useState<Acesso[]>([])
   const [carregando, setCarregando] = useState(true)
+  // Uma tentativa por sessão: o remendo dispara uma escrita, que reabre o
+  // listener — sem esta trava viraria laço.
+  const jaRemendou = useRef(false)
 
   useEffect(() => {
     return observarAcessos(
       (l) => {
         setLista(l)
         setCarregando(false)
+
+        if (!jaRemendou.current) {
+          jaRemendou.current = true
+          const minha = l.find((a) => a.uid === meuUid)
+          void completarMinhaEntrada(meuUid, meuEmail, minha).catch(() => {
+            // Falhar aqui é cosmético — a lista só fica sem o e-mail. Não vale
+            // um alerta vermelho na tela por isso.
+          })
+        }
       },
       (err) => {
         setCarregando(false)
@@ -75,6 +88,7 @@ export function AcessosPanel({
         lista={lista}
         carregando={carregando}
         meuUid={meuUid}
+        meuEmail={meuEmail}
         onAviso={onAviso}
         onErro={onErro}
       />
@@ -235,12 +249,14 @@ function ListaPanel({
   lista,
   carregando,
   meuUid,
+  meuEmail,
   onAviso,
   onErro,
 }: {
   lista: Acesso[]
   carregando: boolean
   meuUid: string
+  meuEmail: string
   onAviso: (msg: string) => void
   onErro: (msg: string) => void
 }) {
@@ -261,6 +277,9 @@ function ListaPanel({
   }
 
   async function redefinir(acesso: Acesso) {
+    if (!acesso.email) {
+      return onErro('Essa entrada não tem e-mail — não dá para enviar a redefinição.')
+    }
     setOcupado(acesso.uid)
     try {
       await enviarRedefinicao(acesso.email)
@@ -283,6 +302,9 @@ function ListaPanel({
           {lista.map((acesso) => {
             const souEu = acesso.uid === meuUid
             const travado = ocupado === acesso.uid
+            // Documento antigo pode estar sem e-mail; na própria linha dá para
+            // suprir com o da conta logada, que é o dado de verdade.
+            const email = acesso.email || (souEu ? meuEmail : '')
             return (
               <li
                 key={acesso.uid}
@@ -291,14 +313,16 @@ function ListaPanel({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[14px] font-medium leading-snug">
-                      {acesso.nome || acesso.email}
+                      {acesso.nome || email}
                       {souEu ? (
                         <span className="ml-2 rounded-full bg-butterfly-100 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-butterfly-600">
                           você
                         </span>
                       ) : null}
                     </p>
-                    <p className="mt-0.5 break-all text-[12.5px] text-ink-faint">{acesso.email}</p>
+                    {email ? (
+                      <p className="mt-0.5 break-all text-[12.5px] text-ink-faint">{email}</p>
+                    ) : null}
                     {acesso.convidadoPor && !souEu ? (
                       <p className="mt-0.5 text-[12px] text-ink-dim">
                         Convidado por {acesso.convidadoPor}
@@ -309,7 +333,7 @@ function ListaPanel({
                   <div className="flex shrink-0 gap-2">
                     <button
                       type="button"
-                      onClick={() => void redefinir(acesso)}
+                      onClick={() => void redefinir({ ...acesso, email })}
                       disabled={travado}
                       className={botaoFino}
                     >
