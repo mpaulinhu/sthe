@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader, PlusIcon, PrimaryButton, Vazio } from '../components/Shell'
-import { CONTRACT_AVATAR, CONTRACT_LABEL, type ContractType, type Person } from '../lib/types'
+import {
+  CONTRACT_AVATAR,
+  CONTRACT_LABEL,
+  CONTRACT_TEXT,
+  type ContractType,
+  type Person,
+} from '../lib/types'
 import { formatMoney, payDayLabel } from '../lib/calc'
 
 const TIPOS: { id: ContractType | 'todos'; label: string }[] = [
@@ -208,7 +214,9 @@ function PersonCard({
           <h3 className="font-display text-[17px] font-semibold leading-tight">{person.name}</h3>
           <p className="mt-0.5 truncate text-[12.5px] text-ink-faint">
             {person.role ? `${person.role} · ` : ''}
-            {CONTRACT_LABEL[person.contract]}
+            <span className={CONTRACT_TEXT[person.contract] || undefined}>
+              {CONTRACT_LABEL[person.contract]}
+            </span>
             {person.method ? ` · ${person.method}` : ''}
           </p>
         </div>

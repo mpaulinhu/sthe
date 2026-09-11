@@ -244,6 +244,18 @@ export const CONTRACT_AVATAR: Record<ContractType, string> = {
   diarista: 'bg-sage-50 text-sage-600 ring-sage-600/15',
 }
 
+/**
+ * Cor do rótulo de tipo de contrato no texto da linha (sublinha do nome).
+ * Fixo fica sem cor própria — herda o cinza neutro do texto ao redor, porque
+ * é o caso mais comum e colorir o padrão também tiraria força da distinção.
+ * Freela e diarista usam as mesmas cores do avatar para a leitura casar.
+ */
+export const CONTRACT_TEXT: Record<ContractType, string> = {
+  fixo: '',
+  freelancer: 'text-butterfly-600',
+  diarista: 'text-sage-600',
+}
+
 export const KIND_LABEL: Record<EntryKind, string> = {
   salario: 'Salário',
   diaria: 'Diária',

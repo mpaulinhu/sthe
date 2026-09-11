@@ -1,5 +1,13 @@
 import { formatMoney, formatShortDate, monthAbbr, type PersonSummary } from '../lib/calc'
-import { CONTRACT_AVATAR, CONTRACT_LABEL, KIND_EFFECT, KIND_LABEL, type Entry, type Receipt } from '../lib/types'
+import {
+  CONTRACT_AVATAR,
+  CONTRACT_LABEL,
+  CONTRACT_TEXT,
+  KIND_EFFECT,
+  KIND_LABEL,
+  type Entry,
+  type Receipt,
+} from '../lib/types'
 
 function initials(name: string): string {
   return name
@@ -169,7 +177,9 @@ export function PersonRow({
           <h3 className="font-display text-[19px] font-semibold leading-tight">{person.name}</h3>
           <p className="mt-0.5 truncate text-[12.5px] text-ink-faint">
             {person.role ? `${person.role} · ` : ''}
-            {CONTRACT_LABEL[person.contract]}
+            <span className={CONTRACT_TEXT[person.contract] || undefined}>
+              {CONTRACT_LABEL[person.contract]}
+            </span>
             {/* A forma aparece só enquanto há o que pagar: depois de quitado
                 ela vira ruído, e o detalhe já mostra como cada parte saiu. */}
             {person.method && falta > 0 ? (
