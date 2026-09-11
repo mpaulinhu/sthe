@@ -10,6 +10,9 @@ import {
 import { formatMoney, payDayLabel } from '../lib/calc'
 import { Avatar } from '../components/Avatar'
 
+/** Altura aproximada do menu de ações — usada só para decidir o lado que abre. */
+const ALTURA_MENU = 180
+
 const TIPOS: { id: ContractType | 'todos'; label: string }[] = [
   { id: 'todos', label: 'Todo mundo' },
   { id: 'fixo', label: 'Fixos' },
@@ -187,11 +190,17 @@ function PersonCard({
   onExcluir: () => void
   inativo?: boolean
 }) {
+  // O menu vive aqui, e não dentro do próprio menu, porque é o card que
+  // precisa subir: `rise-in` é uma animação, e animação cria contexto de
+  // empilhamento — o z-index do menu só valia dentro do card, então o card
+  // seguinte passava por cima e cortava a lista de ações ao meio.
+  const [menuAberto, setMenuAberto] = useState(false)
+
   return (
     <div
       className={`rise-in group relative flex items-center gap-3.5 rounded-[18px] border border-blush-100 bg-white pl-[18px] pr-3 py-4 shadow-petal transition-all duration-300 hover:-translate-y-px hover:border-blush-200 hover:shadow-lift ${
         inativo ? 'opacity-60' : ''
-      }`}
+      } ${menuAberto ? 'z-20' : ''}`}
       style={{ ['--i' as string]: index }}
     >
       <button onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3.5 text-left">
@@ -223,6 +232,8 @@ function PersonCard({
       <PersonCardMenu
         person={person}
         inativo={inativo}
+        aberto={menuAberto}
+        setAberto={setMenuAberto}
         onEditar={onEditar}
         onArquivar={onArquivar}
         onReativar={onReativar}
@@ -235,6 +246,8 @@ function PersonCard({
 function PersonCardMenu({
   person,
   inativo,
+  aberto,
+  setAberto,
   onEditar,
   onArquivar,
   onReativar,
@@ -242,13 +255,17 @@ function PersonCardMenu({
 }: {
   person: Person
   inativo?: boolean
+  aberto: boolean
+  setAberto: (v: boolean) => void
   onEditar: () => void
   onArquivar?: () => void
   onReativar?: () => void
   onExcluir: () => void
 }) {
-  const [aberto, setAberto] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+
+  /** Abre para cima quando não há espaço abaixo — o último card da lista. */
+  const [paraCima, setParaCima] = useState(false)
 
   useEffect(() => {
     if (!aberto) return
@@ -264,12 +281,22 @@ function PersonCardMenu({
       document.removeEventListener('mousedown', onFora)
       document.removeEventListener('keydown', onEsc)
     }
-  }, [aberto])
+  }, [aberto, setAberto])
+
+  function alternar() {
+    // Mede antes de abrir: no último card da lista o menu sairia pela borda
+    // de baixo da janela, e a pessoa não conseguiria clicar em "Excluir".
+    if (!aberto && ref.current) {
+      const { bottom } = ref.current.getBoundingClientRect()
+      setParaCima(window.innerHeight - bottom < ALTURA_MENU)
+    }
+    setAberto(!aberto)
+  }
 
   return (
     <div ref={ref} className="relative shrink-0">
       <button
-        onClick={() => setAberto((v) => !v)}
+        onClick={alternar}
         aria-label={`Mais ações para ${person.name}`}
         aria-expanded={aberto}
         className="flex h-8 w-8 items-center justify-center rounded-[10px] text-ink-dim transition-colors hover:bg-blush-50 hover:text-blush-500"
@@ -284,7 +311,9 @@ function PersonCardMenu({
       {aberto ? (
         <div
           role="menu"
-          className="absolute right-0 top-[calc(100%+4px)] z-10 w-[184px] overflow-hidden rounded-[14px] border border-blush-100 bg-white py-1.5 shadow-lift [animation:fadeIn_.15s_ease]"
+          className={`absolute right-0 z-10 w-[184px] overflow-hidden rounded-[14px] border border-blush-100 bg-white py-1.5 shadow-lift [animation:fadeIn_.15s_ease] ${
+            paraCima ? 'bottom-[calc(100%+4px)]' : 'top-[calc(100%+4px)]'
+          }`}
         >
           <button
             role="menuitem"
