@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MonthNav, TopNav, type TabId } from './components/Shell'
 import { PersonSheet } from './components/PersonSheet'
 import { AddToMonthSheet } from './components/AddToMonthSheet'
@@ -16,6 +16,7 @@ import { ConfiguracoesPage } from './pages/ConfiguracoesPage'
 import { exportDb, parseImportedDb, uid } from './lib/storage'
 import { useCloudDb } from './lib/useCloudDb'
 import { aplicarTema, lerTema, observarSistema, salvarTema, type Tema } from './lib/theme'
+import { useDesfazer } from './lib/useDesfazer'
 import { sair } from './lib/auth'
 import { LoginScreen } from './components/LoginScreen'
 import { centsToNumber } from './lib/money'
@@ -46,6 +47,7 @@ import {
   type Person,
   type Receipt,
   type AgendaItem,
+  type Database,
 } from './lib/types'
 import { hashReceipt, lastHash, nextNumber } from './lib/receipt'
 
@@ -203,6 +205,21 @@ export default function App() {
     setToast(msg)
   }
 
+  /**
+   * Ctrl+Z / Ctrl+Shift+Z.
+   *
+   * Cada ação que altera o banco chama `registrar` ANTES de mexer, dizendo o
+   * que está prestes a fazer. A exceção é assinar recibo: uma vez emitido, o
+   * documento existe e desfazer o pagamento o deixaria órfão — comprovando
+   * algo que o app passaria a dizer que não aconteceu.
+   */
+  const aplicarEstado = useCallback((d: Database) => setDb(() => d), [setDb])
+  const { registrar, esquecer, desfazer, refazer, temPassado, temFuturo } = useDesfazer(
+    db,
+    aplicarEstado,
+    flash,
+  )
+
   // -------------------------------------------------------------------------
   // Pessoas e lançamentos
   // -------------------------------------------------------------------------
@@ -213,6 +230,7 @@ export default function App() {
    * segundo passo — cadastrar e trazer pro mês na mesma ação.
    */
   function upsertPerson(person: Person, entrarNoMes = false) {
+    registrar(db.people.some((p) => p.id === person.id) ? 'Edição de pessoa' : 'Nova pessoa')
     const editando = db.people.some((p) => p.id === person.id)
     setDb((d) => ({
       ...d,
@@ -229,11 +247,13 @@ export default function App() {
   }
 
   function salvarEmpresa(company: Company) {
+    registrar('Dados da empresa')
     setDb((d) => ({ ...d, company }))
     flash('Dados de quem paga salvos.')
   }
 
   function archivePerson(id: string) {
+    registrar('Arquivar pessoa')
     const alvo = db.people.find((p) => p.id === id)
     // Guarda quando ela saiu: é o que faz um fixo continuar aparecendo nos
     // meses em que trabalhou e sumir só dos meses seguintes à saída.
@@ -249,6 +269,7 @@ export default function App() {
   }
 
   function reactivatePerson(id: string) {
+    registrar('Reativar pessoa')
     const alvo = db.people.find((p) => p.id === id)
     setDb((d) => ({
       ...d,
@@ -267,6 +288,7 @@ export default function App() {
    * itens de agenda continuam existindo, só perdem a referência a ela.
    */
   function deletePerson(id: string) {
+    registrar('Exclusão de pessoa')
     const alvo = db.people.find((p) => p.id === id)
     setDb((d) => ({
       ...d,
@@ -286,6 +308,7 @@ export default function App() {
 
   /** Marca quem foi escolhido no sheet "Adicionar ao mês" como participante. */
   function addMonthMembers(personIds: string[]) {
+    registrar('Adicionar ao mês')
     if (personIds.length === 0) return
     setDb((d) => ({
       ...d,
@@ -303,6 +326,7 @@ export default function App() {
   }
 
   function toggleEntry(entry: Entry) {
+    registrar('Marcar lançamento')
     setDb((d) => ({
       ...d,
       entries: d.entries.map((e) => (e.id === entry.id ? { ...e, paid: !e.paid } : e)),
@@ -329,6 +353,7 @@ export default function App() {
       : []
     const idVale = quita ? '' : uid()
 
+    registrar('Pagamento')
     setDb((d) => {
       if (quita) {
         return {
@@ -468,6 +493,11 @@ export default function App() {
         : d.people,
     }))
 
+    // Daqui não se volta. O recibo está assinado e encadeado no hash do
+    // anterior; desfazer o pagamento que ele comprova deixaria o documento
+    // apontando para algo que o app passaria a dizer que não aconteceu.
+    esquecer()
+
     setSheet({ mode: 'recibo', recibo })
   }
 
@@ -490,6 +520,7 @@ export default function App() {
     const hoje = new Date().toISOString().slice(0, 10)
     const total = alvos.reduce((acc, s) => acc + s.falta, 0)
 
+    registrar('Pagamento em lote')
     setDb((d) => ({
       ...d,
       entries: d.entries.map((e) =>
@@ -526,12 +557,14 @@ export default function App() {
       receiptName: r.receiptName || undefined,
       createdAt: new Date().toISOString(),
     }
+    registrar(KIND_LABEL[r.kind])
     setDb((d) => ({ ...d, entries: [...d.entries, novo] }))
     setSheet(null)
     flash(`${KIND_LABEL[r.kind]} de ${formatMoney(valor)} lançado.`)
   }
 
   function repetirMesAnterior() {
+    registrar('Repetir mês anterior')
     setDb((d) => ({ ...d, entries: [...d.entries, ...repetiveis] }))
     flash(`${repetiveis.length} lançamentos trazidos.`)
   }
@@ -542,6 +575,7 @@ export default function App() {
 
   function upsertAgendaItem(item: AgendaItem) {
     const editando = db.agenda.some((it) => it.id === item.id)
+    registrar(editando ? 'Edição na agenda' : 'Novo item na agenda')
     setDb((d) => ({
       ...d,
       agenda: editando
@@ -559,6 +593,12 @@ export default function App() {
    * de fato aconteceu, e some sozinha.
    */
   function moverAgendaItem(id: string, date: string, duplicar: boolean) {
+    // Registra antes de mexer, mas só se houver mudança: soltar o item no
+    // mesmo dia não é uma ação, e entupiria o histórico com passos vazios.
+    const item = db.agenda.find((it) => it.id === id)
+    if (!item || item.date === date) return
+    registrar(duplicar ? 'Cópia na agenda' : 'Item movido')
+
     setDb((d) => {
       const item = d.agenda.find((it) => it.id === id)
       if (!item || item.date === date) return d
@@ -573,6 +613,7 @@ export default function App() {
   }
 
   function deleteAgendaItem(id: string) {
+    registrar('Excluir item da agenda')
     setDb((d) => ({ ...d, agenda: d.agenda.filter((it) => it.id !== id) }))
     flash('Item excluído.')
   }
@@ -587,6 +628,7 @@ export default function App() {
       try {
         const imported = parseImportedDb(String(reader.result))
         if (window.confirm('Isso substitui os dados atuais. Continuar?')) {
+          registrar('Restaurar backup')
           setDb(() => imported)
           flash('Dados restaurados.')
         }
@@ -644,6 +686,30 @@ export default function App() {
                 e.target.value = ''
               }}
             />
+            {/* Só aparecem quando há o que desfazer: botão permanentemente
+                apagado vira ruído, e o atalho de teclado continua valendo. */}
+            {temPassado ? (
+              <button
+                onClick={desfazer}
+                title="Desfazer (Ctrl+Z)"
+                aria-label="Desfazer"
+                className="flex rounded-[10px] p-2 text-ink-faint transition-colors hover:bg-blush-100 hover:text-blush-600"
+              >
+                <UndoIcon />
+              </button>
+            ) : null}
+
+            {temFuturo ? (
+              <button
+                onClick={refazer}
+                title="Refazer (Ctrl+Shift+Z)"
+                aria-label="Refazer"
+                className="flex rounded-[10px] p-2 text-ink-faint transition-colors hover:bg-blush-100 hover:text-blush-600"
+              >
+                <UndoIcon virado />
+              </button>
+            ) : null}
+
             <button
               onClick={() => setDiscreet(!discreet)}
               aria-pressed={discreet}
@@ -898,6 +964,26 @@ export default function App() {
 
       {__DEMO__ ? <DemoNotice /> : null}
     </div>
+  )
+}
+
+/** Seta curva de desfazer; espelhada vira refazer. */
+function UndoIcon({ virado }: { virado?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className="h-[17px] w-[17px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={virado ? { transform: 'scaleX(-1)' } : undefined}
+      aria-hidden
+    >
+      <path d="M7.5 7.5H12a4 4 0 0 1 0 8H8" />
+      <path d="M10 4.5 6.5 7.5 10 10.5" />
+    </svg>
   )
 }
 
