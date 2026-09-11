@@ -7,6 +7,17 @@ import type { Company } from '../lib/types'
 const DOC_LABEL = { cnpj: 'CNPJ', cpf: 'CPF' } as const
 const DOC_PLACEHOLDER = { cnpj: '00.000.000/0000-00', cpf: '000.000.000-00' } as const
 
+/** Domingo a sábado, na ordem de `Date.getDay()` — é o índice que `workDays` guarda. */
+const DIAS_SEMANA = [
+  { dia: 0, label: 'D' },
+  { dia: 1, label: 'S' },
+  { dia: 2, label: 'T' },
+  { dia: 3, label: 'Q' },
+  { dia: 4, label: 'Q' },
+  { dia: 5, label: 'S' },
+  { dia: 6, label: 'S' },
+]
+
 /**
  * Configurações de quem paga.
  *
@@ -46,6 +57,7 @@ export function ConfiguracoesPage({
       return onError(`Confira o ${DOC_LABEL[docType]} — os dígitos não batem.`)
     }
     onSave({
+      ...company,
       name: name.trim(),
       doc: docLimpo,
       docType,
@@ -58,6 +70,19 @@ export function ConfiguracoesPage({
   function trocarTipo(t: 'cnpj' | 'cpf') {
     setDocType(t)
     setDoc('')
+  }
+
+  // Toggle de dia útil salva na hora — é uma config binária, sem texto para
+  // digitar errado, e trava o cálculo de "Nº dia útil" se ficar sem salvar.
+  function alternarDia(dia: number) {
+    const semEsseDia = company.workDays.filter((d) => d !== dia)
+    const jaTinha = semEsseDia.length !== company.workDays.length
+    const workDays = jaTinha ? semEsseDia : [...company.workDays, dia].sort()
+    if (workDays.length === 0) {
+      onError('Marque pelo menos um dia — sem nenhum, não dá para calcular dia útil.')
+      return
+    }
+    onSave({ ...company, workDays })
   }
 
   const incompleto = !company.name
@@ -189,6 +214,44 @@ export function ConfiguracoesPage({
           <p className="mt-4 text-[12.5px] leading-relaxed text-ink-faint">
             Mudar estes dados não altera os recibos já emitidos — cada um guarda o que estava
             aqui no momento da assinatura, que é o que faz o documento continuar válido.
+          </p>
+        </Panel>
+      </div>
+
+      <div className="mt-5">
+        <Panel title="Dias de trabalho">
+          <p className="text-[12.5px] leading-relaxed text-ink-faint">
+            Marque os dias da semana em que a empresa funciona. É o calendário usado para contar
+            o "Nº dia útil" de quem recebe assim — sábado, domingo e feriados não entram na
+            contagem, a não ser que você marque o dia da semana correspondente aqui.
+          </p>
+
+          <div className="mt-4 flex gap-2">
+            {DIAS_SEMANA.map(({ dia, label }) => {
+              const ativo = company.workDays.includes(dia)
+              return (
+                <button
+                  key={dia}
+                  type="button"
+                  onClick={() => alternarDia(dia)}
+                  aria-pressed={ativo}
+                  aria-label={
+                    ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][dia]
+                  }
+                  className={`flex h-11 w-11 items-center justify-center rounded-full text-[13.5px] font-semibold transition-colors ${
+                    ativo
+                      ? 'bg-butterfly-500 text-white'
+                      : 'bg-cream text-ink-faint hover:bg-cream-deep hover:text-ink-soft'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+
+          <p className="mt-3 text-[12px] text-ink-dim">
+            Muda na hora — sem precisar salvar.
           </p>
         </Panel>
       </div>

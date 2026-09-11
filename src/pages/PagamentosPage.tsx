@@ -11,6 +11,7 @@ import {
 import { PersonRow } from '../components/PersonRow'
 import {
   formatPeriod,
+  formatShortDate,
   shiftPeriod,
   type FilterKey,
   type Group,
@@ -116,10 +117,12 @@ export function PagamentosPage({
   const mostrarFiltroTipo =
     (Object.keys(contagemPorTipo) as ContractType[]).filter((t) => contagemPorTipo[t] > 0).length > 1
 
-  // Quem ainda vai vencer, em ordem — alimenta o painel da direita.
+  // Quem ainda vai vencer, em ordem — alimenta o painel da direita. Ordena
+  // pela data real do mês (não o número cru do cadastro), senão um "dia 31"
+  // que virou dia 30 apareceria fora de ordem.
   const proximos = summaries
     .filter((s) => s.falta > 0 && !s.atrasado)
-    .sort((a, b) => a.person.payDay - b.person.payDay)
+    .sort((a, b) => a.dataPagamento.localeCompare(b.dataPagamento))
     .slice(0, 5)
 
   const porFuncao = payrollByRole(db, period).slice(0, 7)
@@ -218,7 +221,7 @@ export function PagamentosPage({
             <StatCell
               index={2}
               label="Próximo"
-              value={stats.proximo ? `Dia ${stats.proximo.person.payDay}` : '—'}
+              value={stats.proximo ? `Dia ${stats.proximo.dataPagamento.slice(8, 10)}` : '—'}
               sub={
                 stats.proximo
                   ? `${stats.proximo.person.name.split(' ')[0]} · ${val(stats.proximo.falta)}`
@@ -470,7 +473,7 @@ export function PagamentosPage({
                             {s.person.name}
                           </p>
                           <p className="mt-0.5 truncate text-[12px] text-ink-faint">
-                            dia {s.person.payDay}
+                            dia {formatShortDate(s.dataPagamento).slice(0, 2)}
                             {s.person.role ? ` · ${s.person.role}` : ''}
                           </p>
                         </div>

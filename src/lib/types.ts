@@ -5,6 +5,16 @@ export type PaymentMethod = 'Pix' | 'Dinheiro' | 'Transferência' | 'Cartão'
 
 export const PAYMENT_METHODS: PaymentMethod[] = ['Pix', 'Dinheiro', 'Transferência', 'Cartão']
 
+/**
+ * Como o dia de pagar é contado: 'fixo' é um número de calendário (todo dia
+ * 5, por exemplo) e cai no último dia do mês quando ele é mais curto (31 em
+ * abril vira 30). 'util' conta dias úteis a partir do 1º do mês, usando o
+ * calendário de dias de trabalho definido em `Company.workDays` — o mesmo
+ * para toda a equipe, porque é a empresa que define a semana de trabalho,
+ * não cada pessoa.
+ */
+export type PayDayMode = 'fixo' | 'util'
+
 export interface Person {
   id: string
   name: string
@@ -12,8 +22,10 @@ export interface Person {
   contract: ContractType
   /** Valor base mensal (fixo) ou valor de referência da diária. Freelancer pode ser 0. */
   baseAmount: number
-  /** Dia do mês em que costuma receber (1-31). Usado para ordenar e alertar atraso. */
+  /** Dia do mês (modo 'fixo') ou o Nº do dia útil (modo 'util'). Sempre 1-31. */
   payDay: number
+  /** Como `payDay` deve ser interpretado. Ausente = 'fixo', para não quebrar cadastros antigos. */
+  payDayMode?: PayDayMode
   /**
    * Como essa pessoa costuma receber. Vira o padrão ao pagar (dá para trocar
    * na hora sem mexer no cadastro) e alimenta o resumo de quanto separar em
@@ -139,7 +151,17 @@ export interface Company {
   tradeName: string
   /** Endereço em uma linha. Opcional, mas reforça a identificação. */
   address: string
+  /**
+   * Quais dias da semana contam como dia de trabalho — índice de
+   * `Date.getDay()` (0 = domingo … 6 = sábado). Único para toda a empresa:
+   * é o que alimenta a contagem de "Nº dia útil" de qualquer pessoa cujo
+   * pagamento use esse modo, sem cada uma ter seu próprio calendário.
+   */
+  workDays: number[]
 }
+
+/** Segunda a sexta — o padrão mais comum, ajustável em Configurações. */
+export const DEFAULT_WORK_DAYS = [1, 2, 3, 4, 5]
 
 export const EMPTY_COMPANY: Company = {
   name: '',
@@ -147,6 +169,7 @@ export const EMPTY_COMPANY: Company = {
   docType: 'cnpj',
   tradeName: '',
   address: '',
+  workDays: DEFAULT_WORK_DAYS,
 }
 
 export interface Database {

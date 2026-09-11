@@ -24,8 +24,8 @@ export function RelatoriosPage({
   const people = useMemo(() => db.people.filter((p) => p.active), [db.people])
 
   const resumos = useMemo(
-    () => people.map((p) => summarizePerson(p, db.entries, period)),
-    [people, db.entries, period],
+    () => people.map((p) => summarizePerson(p, db.entries, period, db.company.workDays)),
+    [people, db.entries, period, db.company.workDays],
   )
 
   const folha = resumos.reduce((acc, s) => acc + s.total, 0)

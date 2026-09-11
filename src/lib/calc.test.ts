@@ -3,14 +3,18 @@ import {
   buildFixedSalaries,
   buildGroups,
   buildRepeatedEntries,
+  payDayLabel,
   peopleVisibleInPeriod,
   pendingByMethod,
+  resolvePayDate,
   sortSummaries,
   statusOf,
   summarizeMonth,
   summarizePerson,
 } from './calc'
 import type { Entry, EntryKind, Person } from './types'
+
+const SEG_A_SEX = [1, 2, 3, 4, 5]
 
 const PERIOD = '2026-08'
 
@@ -448,6 +452,68 @@ describe('buildFixedSalaries', () => {
     // Fevereiro de 2026 tem 28 dias — o vencimento cai no último.
     const novos = buildFixedSalaries([], '2026-02', [person({ payDay: 31 })], id)
     expect(novos[0].date).toBe('2026-02-28')
+  })
+})
+
+describe('resolvePayDate — dia fixo', () => {
+  it('mantém o dia quando o mês tem dias suficientes', () => {
+    expect(resolvePayDate('2026-08', { payDay: 10, payDayMode: 'fixo' })).toBe('2026-08-10')
+  })
+
+  it('dia 31 em novembro (30 dias) cai no dia 30 — o bug relatado', () => {
+    expect(resolvePayDate('2026-11', { payDay: 31, payDayMode: 'fixo' })).toBe('2026-11-30')
+  })
+
+  it('dia 30 em fevereiro cai no último dia do mês', () => {
+    expect(resolvePayDate('2026-02', { payDay: 30, payDayMode: 'fixo' })).toBe('2026-02-28')
+  })
+
+  it('sem payDayMode definido (cadastro antigo) se comporta como fixo', () => {
+    expect(resolvePayDate('2026-11', { payDay: 31 })).toBe('2026-11-30')
+  })
+})
+
+describe('resolvePayDate — dia útil', () => {
+  it('conta a partir do 1º do mês usando o calendário seg-sex', () => {
+    // Agosto de 2026 começa numa sábado — 1º dia útil é segunda, dia 3.
+    expect(resolvePayDate('2026-08', { payDay: 1, payDayMode: 'util' }, SEG_A_SEX)).toBe(
+      '2026-08-03',
+    )
+  })
+
+  it('5º dia útil de setembro de 2026 (começa numa terça)', () => {
+    // 1=ter(1) 2=qua(2) 3=qui(3) 4=sex(4) [sáb 5, dom 6 pulam] 5=seg(7)
+    expect(resolvePayDate('2026-09', { payDay: 5, payDayMode: 'util' }, SEG_A_SEX)).toBe(
+      '2026-09-07',
+    )
+  })
+
+  it('calendário customizado (incluindo sábado) conta diferente', () => {
+    const comSabado = [1, 2, 3, 4, 5, 6]
+    expect(resolvePayDate('2026-09', { payDay: 5, payDayMode: 'util' }, comSabado)).toBe(
+      '2026-09-05',
+    )
+  })
+
+  it('cai no último dia útil do mês se não houver dias suficientes', () => {
+    // Fevereiro de 2026: só 20 dias úteis (seg-sex). Pedir o 25º não pode
+    // estourar para março — usa o último que existe.
+    const resultado = resolvePayDate('2026-02', { payDay: 25, payDayMode: 'util' }, SEG_A_SEX)
+    expect(resultado.startsWith('2026-02-')).toBe(true)
+  })
+})
+
+describe('payDayLabel', () => {
+  it('descreve dia fixo', () => {
+    expect(payDayLabel({ payDay: 5, payDayMode: 'fixo' })).toBe('dia 5')
+  })
+
+  it('descreve dia útil', () => {
+    expect(payDayLabel({ payDay: 5, payDayMode: 'util' })).toBe('5º dia útil')
+  })
+
+  it('sem payDayMode se comporta como fixo', () => {
+    expect(payDayLabel({ payDay: 10 })).toBe('dia 10')
   })
 })
 

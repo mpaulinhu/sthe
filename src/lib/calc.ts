@@ -1,4 +1,5 @@
 import {
+  DEFAULT_WORK_DAYS,
   KIND_EFFECT,
   defaultKindFor,
   type Entry,
@@ -24,6 +25,12 @@ export interface PersonSummary {
    * dívida em aberto: serve para avisar de quem venceu e não teve nada lançado.
    */
   venceu: boolean
+  /**
+   * A data real de pagamento neste período (YYYY-MM-DD), já resolvendo o modo
+   * fixo/dia útil — é o que a lista deve exibir e ordenar, nunca `person.payDay`
+   * cru, que pode apontar para um dia que não existe neste mês.
+   */
+  dataPagamento: string
 }
 
 export interface MonthSummary {
@@ -114,7 +121,12 @@ export function peopleVisibleInPeriod(
   })
 }
 
-export function summarizePerson(person: Person, allEntries: Entry[], period: string): PersonSummary {
+export function summarizePerson(
+  person: Person,
+  allEntries: Entry[],
+  period: string,
+  workDays: number[] = DEFAULT_WORK_DAYS,
+): PersonSummary {
   const entries = allEntries
     .filter((e) => e.personId === person.id && e.period === period)
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -144,15 +156,16 @@ export function summarizePerson(person: Person, allEntries: Entry[], period: str
   const falta = Math.max(0, total - pago)
 
   // "Atrasado" olha o dia combinado de pagamento da pessoa, não a data de cada
-  // lançamento: é assim que ela pensa ("a Ana recebe dia 5 e hoje é 27").
-  // Só faz sentido dentro do mês corrente — meses passados com saldo em aberto
-  // contam como atraso, e meses futuros nunca.
+  // lançamento: é assim que ela pensa ("a Ana recebe dia 5 e hoje é 27"). Usa
+  // a data real resolvida (não o número cru do cadastro) — um "dia 31"
+  // cadastrado não pode vencer cedo demais num mês que só tem 30.
+  const dataPagamento = resolvePayDate(period, person, workDays)
   const hoje = todayIso()
   const mesAtual = hoje.slice(0, 7)
   let venceu: boolean
   if (period < mesAtual) venceu = true
   else if (period > mesAtual) venceu = false
-  else venceu = person.payDay < Number(hoje.slice(8, 10))
+  else venceu = dataPagamento < hoje
 
   const atrasado = falta > 0 && venceu
 
@@ -162,6 +175,7 @@ export function summarizePerson(person: Person, allEntries: Entry[], period: str
     total,
     pago,
     falta,
+    dataPagamento,
     quitado: total > 0 && falta === 0,
     atrasado,
     venceu,
@@ -186,7 +200,12 @@ export function sortSummaries(list: PersonSummary[], sort: SortKey): PersonSumma
   return [...list].sort((a, b) => {
     if (sort === 'valor') return b.falta - a.falta || byName(a, b)
     if (sort === 'nome') return byName(a, b)
-    return a.person.payDay - b.person.payDay || byName(a, b)
+    // Compara pelo dia do mês da data real (não o mês/ano inteiro): dois
+    // períodos diferentes não fazem sentido misturados numa mesma lista, e
+    // comparar a data completa ordenaria por mês antes de por dia.
+    const diaA = Number(a.dataPagamento.slice(8, 10))
+    const diaB = Number(b.dataPagamento.slice(8, 10))
+    return diaA - diaB || byName(a, b)
   })
 }
 
@@ -246,6 +265,15 @@ export function formatShortDate(iso: string): string {
 export function monthAbbr(period: string): string {
   const [y, m] = period.split('-').map(Number)
   return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
+}
+
+/**
+ * Como o dia de pagar é descrito fora do contexto de um mês específico (no
+ * cadastro, na lista de Equipe): "dia 5" para fixo, "5º dia útil" para o
+ * outro modo. Não resolve para uma data real — isso é `resolvePayDate`.
+ */
+export function payDayLabel(person: Pick<Person, 'payDay' | 'payDayMode'>): string {
+  return person.payDayMode === 'util' ? `${person.payDay}º dia útil` : `dia ${person.payDay}`
 }
 
 /**
@@ -309,6 +337,7 @@ export function buildFixedSalaries(
   people: Person[],
   makeId: () => string,
   memberships: MonthMembership[] = [],
+  workDays: number[] = DEFAULT_WORK_DAYS,
 ): Entry[] {
   const jaTem = new Set(entries.filter((e) => e.period === period).map((e) => e.personId))
   const noMes = new Set(
@@ -328,7 +357,7 @@ export function buildFixedSalaries(
       // freelancer sairia errado no recibo e no relatório por função.
       kind: defaultKindFor(p.contract),
       amount: p.baseAmount,
-      date: dayInPeriod(period, p.payDay),
+      date: resolvePayDate(period, p, workDays),
       paid: false,
       description: '',
       createdAt: new Date().toISOString(),
@@ -340,6 +369,48 @@ function dayInPeriod(period: string, day: number): string {
   const [y, m] = period.split('-').map(Number)
   const ultimoDia = new Date(y, m, 0).getDate()
   return `${period}-${String(Math.min(Math.max(1, day), ultimoDia)).padStart(2, '0')}`
+}
+
+/**
+ * O Nº-ésimo dia útil do período, contando a partir do dia 1 e usando
+ * `workDays` (índices de `Date.getDay()`) como calendário. Se o mês não tiver
+ * dias úteis suficientes para chegar em `nth`, cai no último dia útil que
+ * existir — nunca estoura para o mês seguinte, que confundiria mais do que
+ * ajuda ("5º dia útil" virando dia 2 do mês que vem).
+ */
+function nthWorkDayInPeriod(period: string, nth: number, workDays: number[]): string {
+  const [y, m] = period.split('-').map(Number)
+  const ultimoDia = new Date(y, m, 0).getDate()
+  const alvo = Math.max(1, nth)
+
+  let contados = 0
+  let ultimoUtil = 1
+  for (let dia = 1; dia <= ultimoDia; dia++) {
+    if (workDays.includes(new Date(y, m - 1, dia).getDay())) {
+      contados++
+      ultimoUtil = dia
+      if (contados === alvo) return `${period}-${String(dia).padStart(2, '0')}`
+    }
+  }
+  // Não tinha dias úteis suficientes no mês — usa o último que existiu.
+  return `${period}-${String(ultimoUtil).padStart(2, '0')}`
+}
+
+/**
+ * A data real de pagamento de `person` dentro do período, resolvendo o modo
+ * ('fixo' cai no último dia do mês quando é mais curto; 'util' conta a
+ * partir do calendário da empresa). É a mesma regra usada para gerar o
+ * lançamento e para exibir o dia na lista — as duas não podem divergir, ou
+ * a tela volta a "mentir" um dia que não existe naquele mês.
+ */
+export function resolvePayDate(
+  period: string,
+  person: Pick<Person, 'payDay' | 'payDayMode'>,
+  workDays: number[] = DEFAULT_WORK_DAYS,
+): string {
+  return person.payDayMode === 'util'
+    ? nthWorkDayInPeriod(period, person.payDay, workDays)
+    : dayInPeriod(period, person.payDay)
 }
 
 /** Mantém o dia, troca o mês/ano — respeitando meses mais curtos (31 → 28/30). */

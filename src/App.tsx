@@ -119,10 +119,17 @@ export default function App() {
   useEffect(() => {
     if (period < currentPeriod()) return
     setDb((d) => {
-      const novos = buildFixedSalaries(d.entries, period, d.people, uid, d.monthMemberships)
+      const novos = buildFixedSalaries(
+        d.entries,
+        period,
+        d.people,
+        uid,
+        d.monthMemberships,
+        d.company.workDays,
+      )
       return novos.length === 0 ? d : { ...d, entries: [...d.entries, ...novos] }
     })
-  }, [period, db.people, db.monthMemberships])
+  }, [period, db.people, db.monthMemberships, db.company.workDays])
 
   // Trocar de mês ou de filtro descarta a seleção: manter marcado alguém que
   // sumiu da tela levaria a pagar sem querer.
@@ -131,8 +138,12 @@ export default function App() {
   }, [period, filtro, tipo])
 
   const summaries = useMemo(
-    () => sortSummaries(peopleDoMes.map((p) => summarizePerson(p, db.entries, period)), sort),
-    [peopleDoMes, db.entries, period, sort],
+    () =>
+      sortSummaries(
+        peopleDoMes.map((p) => summarizePerson(p, db.entries, period, db.company.workDays)),
+        sort,
+      ),
+    [peopleDoMes, db.entries, period, sort, db.company.workDays],
   )
 
   const stats = useMemo(() => monthStats(summaries), [summaries])
@@ -684,6 +695,8 @@ export default function App() {
       {sheet?.mode === 'pessoa' ? (
         <PersonSheet
           initial={sheet.person}
+          period={period}
+          workDays={db.company.workDays}
           onSave={(p) => upsertPerson(p, sheet.entrarNoMes)}
           onArchive={sheet.person ? () => archivePerson(sheet.person!.id) : undefined}
           onReactivate={sheet.person ? () => reactivatePerson(sheet.person!.id) : undefined}

@@ -1,4 +1,5 @@
 import {
+  DEFAULT_WORK_DAYS,
   EMPTY_COMPANY,
   type AgendaItem,
   type Company,
@@ -61,7 +62,16 @@ function migrate(raw: unknown): Database {
   // Campo a campo em vez de espalhar o objeto salvo: um backup antigo pode ter
   // só parte das chaves, e o resto precisa cair no padrão em vez de virar
   // `undefined` dentro de um campo que a interface promete existir.
-  const company: Company = { ...EMPTY_COMPANY, ...(db.company ?? {}) }
+  const company: Company = {
+    ...EMPTY_COMPANY,
+    ...(db.company ?? {}),
+    // Backup de antes do calendário de dias úteis existir, ou corrompido:
+    // um array vazio travaria a contagem de "Nº dia útil" para sempre.
+    workDays:
+      Array.isArray(db.company?.workDays) && db.company.workDays.length > 0
+        ? db.company.workDays
+        : DEFAULT_WORK_DAYS,
+  }
 
   return { version: 7, company, people: db.people, entries, agenda, monthMemberships, recibos }
 }

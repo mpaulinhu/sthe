@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Sheet, Label, Segmented, fieldClass } from './Sheet'
 import { MoneyInput } from './MoneyInput'
 import { centsToNumber, numberToCents } from '../lib/money'
+import { formatShortDate, resolvePayDate } from '../lib/calc'
 import {
   CONTRACT_SHORT,
   PAYMENT_METHODS,
   type ContractType,
+  type PayDayMode,
   type PaymentMethod,
   type Person,
 } from '../lib/types'
@@ -16,6 +18,11 @@ const CONTRACTS: { id: ContractType; label: string }[] = [
   { id: 'fixo', label: CONTRACT_SHORT.fixo },
   { id: 'diarista', label: CONTRACT_SHORT.diarista },
   { id: 'freelancer', label: CONTRACT_SHORT.freelancer },
+]
+
+const PAY_DAY_MODES: { id: PayDayMode; label: string }[] = [
+  { id: 'fixo', label: 'Dia fixo' },
+  { id: 'util', label: 'Dia útil' },
 ]
 
 const BASE_LABEL: Record<ContractType, string> = {
@@ -33,6 +40,8 @@ const BASE_HINT: Record<ContractType, string> = {
 
 export function PersonSheet({
   initial,
+  period,
+  workDays,
   onSave,
   onArchive,
   onReactivate,
@@ -40,6 +49,10 @@ export function PersonSheet({
   onError,
 }: {
   initial?: Person
+  /** Mês exibido em Pagamentos — usado só para a prévia de "cai em tal dia". */
+  period: string
+  /** Calendário de dias úteis da empresa (Configurações), para resolver o modo 'util'. */
+  workDays: number[]
   onSave: (person: Person) => void
   onArchive?: () => void
   /** Presente só quando `initial.active` é false — volta a pessoa pro banco ativo. */
@@ -52,12 +65,25 @@ export function PersonSheet({
   const [contract, setContract] = useState<ContractType>(initial?.contract ?? 'fixo')
   const [cents, setCents] = useState(numberToCents(initial?.baseAmount ?? 0))
   const [payDay, setPayDay] = useState(initial ? String(initial.payDay) : '')
+  const [payDayMode, setPayDayMode] = useState<PayDayMode>(initial?.payDayMode ?? 'fixo')
   const [method, setMethod] = useState<PaymentMethod>(initial?.method ?? 'Pix')
   const [doc, setDoc] = useState(initial?.doc ? maskCpf(initial.doc) : '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
 
   const docLimpo = onlyDigits(doc)
   const docErrado = docLimpo.length === 11 && !isValidCpf(docLimpo)
+
+  const diaDigitado = Math.min(31, Math.max(1, Number(payDay) || 5))
+
+  // Prévia de em que dia isso cai no mês aberto — é o que torna visível, na
+  // hora do cadastro, que "dia 31" ou "5º dia útil" nem sempre significa o
+  // que parece: o mês pode ser mais curto, ou não ter dias úteis suficientes.
+  const dataResolvida = useMemo(
+    () => resolvePayDate(period, { payDay: diaDigitado, payDayMode }, workDays),
+    [period, diaDigitado, payDayMode, workDays],
+  )
+  const diaResolvido = Number(dataResolvida.slice(8, 10))
+  const ajustado = payDayMode === 'fixo' ? diaResolvido !== diaDigitado : null
 
   function confirm() {
     if (!name.trim()) {
@@ -71,14 +97,14 @@ export function PersonSheet({
       onError('Confira o CPF — os dígitos não batem.')
       return
     }
-    const dia = Math.min(31, Math.max(1, Number(payDay) || 5))
     onSave({
       id: initial?.id ?? uid(),
       name: name.trim(),
       role: role.trim(),
       contract,
       baseAmount: centsToNumber(cents),
-      payDay: dia,
+      payDay: diaDigitado,
+      payDayMode,
       method,
       doc: docLimpo || undefined,
       active: initial?.active ?? true,
@@ -135,23 +161,43 @@ export function PersonSheet({
         <Segmented options={CONTRACTS} value={contract} onChange={setContract} />
       </div>
 
-      <div className="flex gap-3">
-        <label className="flex flex-1 flex-col gap-[7px]">
-          <Label>{BASE_LABEL[contract]}</Label>
-          <MoneyInput cents={cents} onChange={setCents} label={BASE_LABEL[contract]} />
-          <span className="text-[12px] leading-snug text-ink-dim">{BASE_HINT[contract]}</span>
-        </label>
-        <label className="flex w-[120px] flex-col gap-[7px]">
-          <Label>Dia de pagar</Label>
-          <input
-            value={payDay}
-            onChange={(e) => setPayDay(e.target.value.replace(/\D/g, '').slice(0, 2))}
-            inputMode="numeric"
-            placeholder="05"
-            aria-label="Dia de pagar"
-            className={`${fieldClass} text-[15px] tabular-nums`}
-          />
-        </label>
+      <label className="flex flex-col gap-[7px]">
+        <Label>{BASE_LABEL[contract]}</Label>
+        <MoneyInput cents={cents} onChange={setCents} label={BASE_LABEL[contract]} />
+        <span className="text-[12px] leading-snug text-ink-dim">{BASE_HINT[contract]}</span>
+      </label>
+
+      <div className="flex flex-col gap-2">
+        <Label>Dia de pagar</Label>
+        <Segmented options={PAY_DAY_MODES} value={payDayMode} onChange={setPayDayMode} size="sm" />
+
+        <div className="flex items-center gap-3">
+          <div className="flex w-[90px] flex-col gap-[7px]">
+            <input
+              value={payDay}
+              onChange={(e) => setPayDay(e.target.value.replace(/\D/g, '').slice(0, 2))}
+              inputMode="numeric"
+              placeholder="05"
+              aria-label={payDayMode === 'util' ? 'Nº do dia útil' : 'Dia do mês'}
+              className={`${fieldClass} text-[15px] tabular-nums`}
+            />
+          </div>
+          <span className="text-[12.5px] leading-snug text-ink-faint">
+            {payDayMode === 'util'
+              ? `${diaDigitado}º dia útil do mês`
+              : `todo dia ${diaDigitado}`}
+          </span>
+        </div>
+
+        {/* Prévia sempre visível, não só quando ajusta: mostra em que dia real
+            isso cai neste mês — "5º dia útil" ou "dia 31" não são óbvios de
+            cabeça, e é melhor ela ver antes de salvar do que descobrir depois
+            que a pessoa "sumiu" da lista de vencimentos do mês. */}
+        <p className={`text-[12px] leading-snug ${ajustado ? 'text-due' : 'text-ink-dim'}`}>
+          {ajustado
+            ? `Este mês não tem dia ${diaDigitado} — cai em ${formatShortDate(dataResolvida)}.`
+            : `Neste mês, cai em ${formatShortDate(dataResolvida)}.`}
+        </p>
       </div>
 
       {/* A forma habitual vira o padrão ao pagar e alimenta o resumo de

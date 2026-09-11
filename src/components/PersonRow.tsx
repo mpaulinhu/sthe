@@ -151,7 +151,7 @@ export function PersonRow({
               atrasado || esquecido ? 'text-late' : 'text-ink-soft'
             }`}
           >
-            {String(person.payDay).padStart(2, '0')}
+            {summary.dataPagamento.slice(8, 10)}
           </p>
           <p className="mt-1 text-[9.5px] font-medium uppercase tracking-[0.1em] text-ink-dim">
             {monthAbbr(period)}

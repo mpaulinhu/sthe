@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader, PlusIcon, PrimaryButton, Vazio } from '../components/Shell'
 import { CONTRACT_AVATAR, CONTRACT_LABEL, type ContractType, type Person } from '../lib/types'
-import { formatMoney } from '../lib/calc'
+import { formatMoney, payDayLabel } from '../lib/calc'
 
 const TIPOS: { id: ContractType | 'todos'; label: string }[] = [
   { id: 'todos', label: 'Todo mundo' },
@@ -220,7 +220,7 @@ function PersonCard({
             </p>
           ) : null}
           <p className="mt-0.5 text-[11px] uppercase tracking-[0.08em] text-ink-dim">
-            {inativo ? 'inativo' : `dia ${person.payDay}`}
+            {inativo ? 'inativo' : payDayLabel(person)}
           </p>
         </div>
       </button>
