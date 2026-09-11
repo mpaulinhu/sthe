@@ -40,6 +40,7 @@ export function PersonRow({
   onToggleEntry,
   onVerRecibo,
   onVerComprovante,
+  onAssinarDepois,
 }: {
   summary: PersonSummary
   period: string
@@ -59,6 +60,8 @@ export function PersonRow({
   onToggleEntry: (entry: Entry) => void
   onVerRecibo?: (r: Receipt) => void
   onVerComprovante?: (entry: Entry) => void
+  /** Reconhecer o recebimento depois de já ter marcado como pago sem assinar na hora. */
+  onAssinarDepois?: (entry: Entry) => void
 }) {
   const { person, entries, total, pago, falta, quitado, atrasado, venceu } = summary
 
@@ -342,6 +345,17 @@ export function PersonRow({
                           </svg>
                           assinado
                         </span>
+                      ) : e.paid && efeito !== 'abate' && onAssinarDepois ? (
+                        // Ela pagou sem colher assinatura na hora (ou desmarcou
+                        // de propósito) — este é o jeito de reconhecer o
+                        // recebimento depois, sem precisar desfazer o pagamento.
+                        <button
+                          type="button"
+                          onClick={() => onAssinarDepois(e)}
+                          className="font-medium text-butterfly-600 underline-offset-2 hover:underline"
+                        >
+                          · assinar recibo
+                        </button>
                       ) : null}
                     </p>
                   </div>

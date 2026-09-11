@@ -375,6 +375,27 @@ export default function App() {
   }
 
   /**
+   * Colher a assinatura depois — para quando ela desmarcou "colher assinatura"
+   * na hora do pagamento (ou pagou fora do app e só lançou aqui) e decide
+   * reconhecer o recebimento mais tarde. O recibo cobre só este lançamento,
+   * pelo valor dele; `quita` reflete a situação atual do mês (se sobrou algo
+   * em aberto depois dele, não é mais "plena e geral quitação").
+   */
+  function assinarDepois(person: Person, entry: Entry) {
+    const resumo = summaries.find((s) => s.person.id === person.id)
+    const quita = !resumo || resumo.falta === 0
+    setSheet({
+      mode: 'assinar',
+      person,
+      valor: entry.amount,
+      method: entry.method ?? 'Pix',
+      entryIds: [entry.id],
+      quita,
+      saldoRestante: resumo?.falta ?? 0,
+    })
+  }
+
+  /**
    * Fecha o ciclo: monta o recibo assinado, encadeia no hash do anterior e
    * abre a tela de envio. O CPF sobe para o cadastro quando é novo, para ela
    * não redigitar no mês que vem.
@@ -638,6 +659,7 @@ export default function App() {
             onToggleEntry={toggleEntry}
             onVerRecibo={(recibo) => setSheet({ mode: 'recibo', recibo })}
             onVerComprovante={(entry) => setSheet({ mode: 'comprovante', entry })}
+            onAssinarDepois={assinarDepois}
           />
         ) : null}
 

@@ -76,6 +76,7 @@ export function PagamentosPage({
   onToggleEntry,
   onVerRecibo,
   onVerComprovante,
+  onAssinarDepois,
 }: {
   db: Database
   period: string
@@ -109,6 +110,7 @@ export function PagamentosPage({
   onToggleEntry: (e: Entry) => void
   onVerRecibo: (r: Receipt) => void
   onVerComprovante: (e: Entry) => void
+  onAssinarDepois: (p: Person, e: Entry) => void
 }) {
   // Cadastro vazio de verdade (nunca cadastrou ninguém) é diferente de "mês
   // sem ninguém visível" — só freelancers sem lançamento neste mês, ou
@@ -472,6 +474,7 @@ export function PagamentosPage({
                           )}
                           onVerRecibo={onVerRecibo}
                           onVerComprovante={onVerComprovante}
+                          onAssinarDepois={(e) => onAssinarDepois(s.person, e)}
                         />
                       ))}
                     </div>
