@@ -8,6 +8,7 @@ import {
   erroDeAcesso,
   observarAcessos,
   removerAcesso,
+  renomearAcesso,
   trocarMinhaSenha,
   type Acesso,
 } from '../lib/acessos'
@@ -262,6 +263,27 @@ function ListaPanel({
 }) {
   const [confirmando, setConfirmando] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
+  // uid em edição e o texto sendo digitado — separados para o Cancelar
+  // conseguir descartar sem tocar no que está salvo.
+  const [renomeando, setRenomeando] = useState<string | null>(null)
+  const [nomeNovo, setNomeNovo] = useState('')
+
+  async function salvarNome(acesso: Acesso) {
+    const limpo = nomeNovo.trim()
+    if (!limpo) return onErro('O nome não pode ficar vazio.')
+    if (limpo === acesso.nome) return setRenomeando(null)
+
+    setOcupado(acesso.uid)
+    try {
+      await renomearAcesso(acesso.uid, limpo)
+      setRenomeando(null)
+      onAviso('Nome trocado.')
+    } catch (err) {
+      onErro(erroDeAcesso(err))
+    } finally {
+      setOcupado(null)
+    }
+  }
 
   async function remover(acesso: Acesso) {
     setOcupado(acesso.uid)
@@ -311,15 +333,46 @@ function ListaPanel({
                 className="rounded-[14px] border border-cream-deep bg-cream px-3.5 py-3"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[14px] font-medium leading-snug">
-                      {acesso.nome || email}
-                      {souEu ? (
-                        <span className="ml-2 rounded-full bg-butterfly-100 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-butterfly-600">
-                          você
-                        </span>
-                      ) : null}
-                    </p>
+                  <div className="min-w-0 flex-1">
+                    {renomeando === acesso.uid ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          value={nomeNovo}
+                          onChange={(e) => setNomeNovo(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') void salvarNome(acesso)
+                            if (e.key === 'Escape') setRenomeando(null)
+                          }}
+                          autoFocus
+                          aria-label="Nome"
+                          className={`${fieldClass} max-w-[220px] flex-1`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void salvarNome(acesso)}
+                          disabled={travado}
+                          className="min-h-[38px] rounded-[10px] bg-ink px-3.5 text-[12.5px] font-medium text-cream transition-colors hover:bg-ink-hover disabled:opacity-50"
+                        >
+                          Salvar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRenomeando(null)}
+                          className={botaoFino}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-[14px] font-medium leading-snug">
+                        {acesso.nome || email}
+                        {souEu ? (
+                          <span className="ml-2 rounded-full bg-butterfly-100 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-butterfly-600">
+                            você
+                          </span>
+                        ) : null}
+                      </p>
+                    )}
                     {email ? (
                       <p className="mt-0.5 break-all text-[12.5px] text-ink-faint">{email}</p>
                     ) : null}
@@ -331,6 +384,18 @@ function ListaPanel({
                   </div>
 
                   <div className="flex shrink-0 gap-2">
+                    {renomeando === acesso.uid ? null : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRenomeando(acesso.uid)
+                          setNomeNovo(acesso.nome || '')
+                        }}
+                        className={botaoFino}
+                      >
+                        Renomear
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => void redefinir({ ...acesso, email })}

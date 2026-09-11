@@ -147,6 +147,17 @@ export async function removerAcesso(uid: string): Promise<void> {
   await deleteDoc(doc(colecao(), uid))
 }
 
+/**
+ * Troca o nome de exibição de um acesso.
+ *
+ * O e-mail não é editável aqui de propósito: ele é a identidade do login no
+ * Authentication, e mudá-lo só no Firestore faria a lista mostrar um endereço
+ * que não é o usado para entrar.
+ */
+export async function renomearAcesso(uid: string, nome: string): Promise<void> {
+  await setDoc(doc(colecao(), uid), { nome: nome.trim() }, { merge: true })
+}
+
 /** Dispara o e-mail de redefinição do próprio Firebase. */
 export async function enviarRedefinicao(email: string): Promise<void> {
   await sendPasswordResetEmail(getAuthOrThrow(), email.trim())
