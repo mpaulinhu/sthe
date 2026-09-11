@@ -39,6 +39,7 @@ export function PersonRow({
   onEditar,
   onToggleEntry,
   onVerRecibo,
+  onVerComprovante,
 }: {
   summary: PersonSummary
   period: string
@@ -57,6 +58,7 @@ export function PersonRow({
   onEditar: () => void
   onToggleEntry: (entry: Entry) => void
   onVerRecibo?: (r: Receipt) => void
+  onVerComprovante?: (entry: Entry) => void
 }) {
   const { person, entries, total, pago, falta, quitado, atrasado, venceu } = summary
 
@@ -315,7 +317,15 @@ export function PersonRow({
                     </p>
                     <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-ink-dim">
                       <span>{sub}</span>
-                      {e.receiptImage ? <span>· comprovante anexado</span> : null}
+                      {e.receiptImage ? (
+                        <button
+                          type="button"
+                          onClick={() => onVerComprovante?.(e)}
+                          className="underline-offset-2 hover:text-butterfly-600 hover:underline"
+                        >
+                          · comprovante anexado
+                        </button>
+                      ) : null}
                       {assinados.has(e.id) ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-paid-soft px-1.5 py-px font-medium text-paid">
                           <svg

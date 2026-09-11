@@ -5,6 +5,7 @@ import { AddToMonthSheet } from './components/AddToMonthSheet'
 import { ValueSheet, type ValueResult } from './components/ValueSheet'
 import { SignSheet, type SignResult } from './components/SignSheet'
 import { ReceiptSheet } from './components/ReceiptSheet'
+import { ProofSheet } from './components/ProofSheet'
 import { Toast } from './components/Toast'
 import { DemoNotice } from './components/DemoNotice'
 import { EquipePage } from './pages/EquipePage'
@@ -65,6 +66,7 @@ type SheetState =
       saldoRestante: number
     }
   | { mode: 'recibo'; recibo: Receipt }
+  | { mode: 'comprovante'; entry: Entry }
   | null
 
 export default function App() {
@@ -635,6 +637,7 @@ export default function App() {
             onEditar={(p) => setSheet({ mode: 'pessoa', person: p })}
             onToggleEntry={toggleEntry}
             onVerRecibo={(recibo) => setSheet({ mode: 'recibo', recibo })}
+            onVerComprovante={(entry) => setSheet({ mode: 'comprovante', entry })}
           />
         ) : null}
 
@@ -766,6 +769,10 @@ export default function App() {
           }}
           onError={flash}
         />
+      ) : null}
+
+      {sheet?.mode === 'comprovante' ? (
+        <ProofSheet entry={sheet.entry} onClose={() => setSheet(null)} />
       ) : null}
 
       <Toast message={toast} onDone={() => setToast('')} />
