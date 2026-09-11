@@ -2,7 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { User } from 'firebase/auth'
 import { nuvemAtiva } from './firebase'
 import { observarUsuario } from './auth'
-import { escutarNuvem, lerDaNuvem, nuvemTemDados, salvarNaNuvem } from './cloud'
+import {
+  escutarNuvem,
+  lerDaNuvem,
+  lerFormatoAntigo,
+  limparFormatoAntigo,
+  nuvemTemDados,
+  salvarNaNuvem,
+} from './cloud'
 import { loadDb, saveDb } from './storage'
 import type { Database } from './types'
 
@@ -73,6 +80,9 @@ export function useCloudDb() {
   /** Cancela o envio anterior quando ela ainda está digitando. */
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
+  /** Só para reavaliar o envio quando a liberação não vem de `db` mudar. */
+  const [pulso, setPulso] = useState(0)
+
   // Quem está logado agora.
   useEffect(() => {
     if (!nuvemAtiva) return
@@ -97,22 +107,35 @@ export function useCloudDb() {
         const temNaNuvem = await nuvemTemDados()
         if (!vivo) return
 
-        // Nuvem vazia e este aparelho com dados: é a primeira vez: sobe o que
-        // existe aqui em vez de apagar tudo com o vazio de lá.
-        if (!temNaNuvem && local.people.length > 0) {
-          await salvarNaNuvem(local)
-          if (!vivo) return
-          setDb(local)
-        } else {
+        if (temNaNuvem) {
           const daNuvem = await lerDaNuvem()
           if (!vivo) return
           setDb(daNuvem)
           saveDb(daNuvem)
+        } else {
+          // Nuvem sem dados no formato novo. Pode ser porque o que está lá
+          // ainda é o formato antigo (uma lista por documento, dentro de
+          // `sthe/`) — nesse caso ele é convertido e o original descartado.
+          const antigo = await lerFormatoAntigo()
+          if (!vivo) return
+
+          const base = antigo ?? local
+          if (base.people.length > 0) {
+            await salvarNaNuvem(base)
+            if (!vivo) return
+            if (antigo) await limparFormatoAntigo()
+            setDb(base)
+            saveDb(base)
+          }
         }
 
         setEstado({ modo: 'pronto', usuario })
         setErroNuvem('')
         podeEmpurrar.current = true
+        // Libera o envio e força uma passada: o que ela mudou enquanto a
+        // primeira carga rodava ficaria parado aqui para sempre, porque nada
+        // mais dispara o efeito de enviar sozinho.
+        setPulso((n) => n + 1)
 
         // Só agora: com a conciliação terminada, o que chegar é mudança de
         // verdade feita em outro aparelho.
@@ -143,6 +166,12 @@ export function useCloudDb() {
   }, [usuario])
 
   // Local sempre; nuvem com um respiro, para não escrever a cada tecla.
+  //
+  // O timer não é limpo na saída do efeito de propósito. Limpar ali cancelava
+  // o envio a cada novo render dentro da janela de espera, e bastava o app
+  // renderizar de novo para o dado nunca chegar na nuvem — sem erro nenhum,
+  // porque nada chegou a ser tentado. Aqui cada mudança substitui o envio
+  // anterior, e o último sempre acontece.
   useEffect(() => {
     saveDb(db)
 
@@ -160,9 +189,10 @@ export function useCloudDb() {
           setErroNuvem(descreverErro(err))
         })
     }, ESPERA_ANTES_DE_SALVAR)
+  }, [db, pulso])
 
-    return () => clearTimeout(timer.current)
-  }, [db])
+  // Ao desmontar, não deixa envio pendente para trás.
+  useEffect(() => () => clearTimeout(timer.current), [])
 
   const atualizar = useCallback((fn: (d: Database) => Database) => setDb(fn), [])
 

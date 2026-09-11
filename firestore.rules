@@ -17,10 +17,20 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/autorizados/$(request.auth.uid));
     }
 
-    // Os dados do negócio: um documento por coleção lógica do app.
-    match /sthe/{documento} {
-      allow read, write: if autorizado();
-    }
+    // Um documento por registro: cada pessoa, lançamento, item de agenda,
+    // recibo e participação de mês tem o seu.
+    match /people/{id}           { allow read, write: if autorizado(); }
+    match /entries/{id}          { allow read, write: if autorizado(); }
+    match /agenda/{id}           { allow read, write: if autorizado(); }
+    match /recibos/{id}          { allow read, write: if autorizado(); }
+    match /monthMemberships/{id} { allow read, write: if autorizado(); }
+
+    // Dados de quem paga: registro único.
+    match /config/{id}           { allow read, write: if autorizado(); }
+
+    // Formato antigo (uma lista por documento). Mantido só para a migração
+    // conseguir ler e apagar o que ficou para trás.
+    match /sthe/{id}             { allow read, write: if autorizado(); }
 
     // Lista de quem pode entrar. Leitura só para conferir a própria entrada;
     // escrita bloqueada para todos — só pelo Console.

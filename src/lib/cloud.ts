@@ -1,41 +1,64 @@
-import { doc, getDoc, onSnapshot, setDoc, type Unsubscribe } from 'firebase/firestore'
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  writeBatch,
+  type Unsubscribe,
+} from 'firebase/firestore'
 import { getDbOrThrow } from './firebase'
-import { EMPTY_COMPANY, type Database } from './types'
+import {
+  EMPTY_COMPANY,
+  type AgendaItem,
+  type Company,
+  type Database,
+  type Entry,
+  type MonthMembership,
+  type Person,
+  type Receipt,
+} from './types'
 
 /**
  * Sincronização do banco com o Firestore.
  *
- * O banco é dividido em um documento por coleção lógica, e não num documento
- * único, por causa do teto de 1 MB por documento do Firestore: comprovantes e
- * fotos são data URLs e somam rápido. Separado, cada parte tem seu próprio
- * espaço, e salvar uma lista não reescreve as outras.
+ * Cada registro é um documento próprio, e não um item dentro de uma lista
+ * gigante. Três motivos, em ordem de importância:
  *
- * Todo mundo autorizado compartilha os mesmos documentos — é um negócio só
- * (ver `firestore.rules`).
+ * 1. O teto de 1 MB por documento. Com fotos de perfil (~40 KB cada), umas
+ *    vinte pessoas numa lista só já estourariam — e a gravação falharia
+ *    inteira, não só a pessoa nova.
+ * 2. Escrever uma pessoa não reescreve as outras. Na lista única, dois
+ *    aparelhos editando pessoas diferentes ao mesmo tempo faziam um
+ *    sobrescrever o trabalho do outro.
+ * 3. É o modelo para o qual o Firestore foi desenhado.
+ *
+ * `company` é a exceção: é um registro só, então continua sendo um documento
+ * só (`config/company`).
  */
 
-/** Um documento por chave; `company` é objeto, o resto são listas. */
-const COLECOES = ['company', 'people', 'entries', 'agenda', 'monthMemberships', 'recibos'] as const
+/** Coleções de lista, com o id de cada documento. */
+const LISTAS = {
+  people: (p: Person) => p.id,
+  entries: (e: Entry) => e.id,
+  agenda: (a: AgendaItem) => a.id,
+  recibos: (r: Receipt) => r.id,
+  // Não tem id próprio: a identidade é quem participa de qual mês. Barra não
+  // pode aparecer em id de documento, então o separador é `__`.
+  monthMemberships: (m: MonthMembership) => `${m.personId}__${m.period}`,
+} as const
 
-type Colecao = (typeof COLECOES)[number]
+type Lista = keyof typeof LISTAS
 
-function ref(colecao: Colecao) {
-  return doc(getDbOrThrow(), 'sthe', colecao)
+const COMPANY_DOC = ['config', 'company'] as const
+
+function colRef(lista: Lista) {
+  return collection(getDbOrThrow(), lista)
 }
 
-/**
- * O Firestore não guarda arrays na raiz de um documento, então cada lista vai
- * embrulhada em `{ itens: [...] }`. `company` é objeto e vai direto.
- */
-export async function salvarNaNuvem(db: Database): Promise<void> {
-  await Promise.all([
-    setDoc(ref('company'), semUndefined(db.company)),
-    setDoc(ref('people'), { itens: semUndefined(db.people) }),
-    setDoc(ref('entries'), { itens: semUndefined(db.entries) }),
-    setDoc(ref('agenda'), { itens: semUndefined(db.agenda) }),
-    setDoc(ref('monthMemberships'), { itens: semUndefined(db.monthMemberships) }),
-    setDoc(ref('recibos'), { itens: semUndefined(db.recibos) }),
-  ])
+function companyRef() {
+  return doc(getDbOrThrow(), ...COMPANY_DOC)
 }
 
 /**
@@ -54,55 +77,164 @@ export function semUndefined<T>(valor: T): T {
   return JSON.parse(JSON.stringify(valor))
 }
 
+/**
+ * Grava o banco inteiro, em lote.
+ *
+ * O lote importa por dois motivos: é atômico (ou entra tudo, ou nada — nunca
+ * um estado pela metade) e conta como uma operação de rede só. Cada lote do
+ * Firestore aceita 500 escritas, então listas maiores são partidas.
+ *
+ * Documentos que sumiram do app são apagados: sem isso, excluir uma pessoa
+ * aqui a deixaria viva na nuvem e ela voltaria na próxima leitura.
+ */
+export async function salvarNaNuvem(db: Database): Promise<void> {
+  const alvo: Record<Lista, { id: string; dado: unknown }[]> = {
+    people: db.people.map((p) => ({ id: LISTAS.people(p), dado: p })),
+    entries: db.entries.map((e) => ({ id: LISTAS.entries(e), dado: e })),
+    agenda: db.agenda.map((a) => ({ id: LISTAS.agenda(a), dado: a })),
+    recibos: db.recibos.map((r) => ({ id: LISTAS.recibos(r), dado: r })),
+    monthMemberships: db.monthMemberships.map((m) => ({
+      id: LISTAS.monthMemberships(m),
+      dado: m,
+    })),
+  }
+
+  const existentes = await Promise.all(
+    (Object.keys(LISTAS) as Lista[]).map(async (lista) => {
+      const snap = await getDocs(colRef(lista))
+      return [lista, new Set(snap.docs.map((d) => d.id))] as const
+    }),
+  )
+  const idsNaNuvem = new Map(existentes)
+
+  const firestore = getDbOrThrow()
+  let lote = writeBatch(firestore)
+  let noLote = 0
+  const lotes = [lote]
+
+  const escrever = (fn: (b: ReturnType<typeof writeBatch>) => void) => {
+    if (noLote >= 500) {
+      lote = writeBatch(firestore)
+      lotes.push(lote)
+      noLote = 0
+    }
+    fn(lote)
+    noLote++
+  }
+
+  for (const lista of Object.keys(LISTAS) as Lista[]) {
+    const itens = alvo[lista]
+    const naNuvem = idsNaNuvem.get(lista) ?? new Set<string>()
+    const idsAgora = new Set(itens.map((i) => i.id))
+
+    for (const { id, dado } of itens) {
+      escrever((b) => b.set(doc(colRef(lista), id), semUndefined(dado) as object))
+    }
+    for (const id of naNuvem) {
+      if (!idsAgora.has(id)) escrever((b) => b.delete(doc(colRef(lista), id)))
+    }
+  }
+
+  escrever((b) => b.set(companyRef(), semUndefined(db.company)))
+
+  await Promise.all(lotes.map((l) => l.commit()))
+}
+
 /** Lê o banco inteiro da nuvem. Coleção ausente vira lista vazia. */
 export async function lerDaNuvem(): Promise<Database> {
-  const [company, people, entries, agenda, memberships, recibos] = await Promise.all(
-    COLECOES.map((c) => getDoc(ref(c))),
+  const [company, people, entries, agenda, memberships, recibos] = await Promise.all([
+    getDoc(companyRef()),
+    getDocs(colRef('people')),
+    getDocs(colRef('entries')),
+    getDocs(colRef('agenda')),
+    getDocs(colRef('monthMemberships')),
+    getDocs(colRef('recibos')),
+  ])
+
+  return {
+    version: 7,
+    company: company.exists()
+      ? { ...EMPTY_COMPANY, ...(company.data() as Company) }
+      : EMPTY_COMPANY,
+    people: people.docs.map((d) => d.data() as Person),
+    entries: entries.docs.map((d) => d.data() as Entry),
+    agenda: agenda.docs.map((d) => d.data() as AgendaItem),
+    monthMemberships: memberships.docs.map((d) => d.data() as MonthMembership),
+    recibos: recibos.docs.map((d) => d.data() as Receipt),
+  }
+}
+
+/** Existe algum dado na nuvem? Decide se a primeira entrada sobe o que há aqui. */
+export async function nuvemTemDados(): Promise<boolean> {
+  const people = await getDocs(colRef('people'))
+  return !people.empty
+}
+
+/**
+ * Escuta mudanças feitas em outros aparelhos.
+ *
+ * Dois cuidados que evitam trabalho à toa:
+ *
+ * - O Firestore entrega um snapshot inicial assim que o listener é
+ *   registrado. Isso é o estado que acabamos de ler, não uma mudança —
+ *   ignorar a primeira entrega evita reler tudo logo na abertura.
+ * - `hasPendingWrites` marca o eco da nossa própria escrita, que volta pelo
+ *   listener. Reagir a ele só reescreveria o que já temos.
+ */
+export function escutarNuvem(aoMudar: (db: Database) => void): Unsubscribe {
+  const jaChegou = new Set<string>()
+
+  const reagir = (chave: string, temEscritaPendente: boolean) => {
+    if (!jaChegou.has(chave)) {
+      jaChegou.add(chave)
+      return
+    }
+    if (temEscritaPendente) return
+    void lerDaNuvem().then(aoMudar)
+  }
+
+  const paradas: Unsubscribe[] = [
+    ...(Object.keys(LISTAS) as Lista[]).map((lista) =>
+      onSnapshot(colRef(lista), (snap) => reagir(lista, snap.metadata.hasPendingWrites)),
+    ),
+    onSnapshot(companyRef(), (snap) => reagir('company', snap.metadata.hasPendingWrites)),
+  ]
+
+  return () => paradas.forEach((parar) => parar())
+}
+
+/**
+ * Apaga o formato antigo (um documento por coleção, dentro de `sthe/`), usado
+ * antes de cada registro virar seu próprio documento. Roda uma vez, depois de
+ * os dados já terem sido migrados para o formato novo.
+ */
+export async function limparFormatoAntigo(): Promise<void> {
+  const antigos = ['company', 'people', 'entries', 'agenda', 'monthMemberships', 'recibos']
+  await Promise.all(
+    antigos.map((nome) => deleteDoc(doc(getDbOrThrow(), 'sthe', nome)).catch(() => {})),
+  )
+}
+
+/** Lê o formato antigo, para migrar o que já estava na nuvem. */
+export async function lerFormatoAntigo(): Promise<Database | null> {
+  const people = await getDoc(doc(getDbOrThrow(), 'sthe', 'people'))
+  if (!people.exists()) return null
+
+  const [company, entries, agenda, memberships, recibos] = await Promise.all(
+    ['company', 'entries', 'agenda', 'monthMemberships', 'recibos'].map((nome) =>
+      getDoc(doc(getDbOrThrow(), 'sthe', nome)),
+    ),
   )
 
   return {
     version: 7,
-    company: company.exists() ? { ...EMPTY_COMPANY, ...company.data() } : EMPTY_COMPANY,
-    people: people.exists() ? (people.data().itens ?? []) : [],
+    company: company.exists()
+      ? { ...EMPTY_COMPANY, ...(company.data() as Company) }
+      : EMPTY_COMPANY,
+    people: people.data()?.itens ?? [],
     entries: entries.exists() ? (entries.data().itens ?? []) : [],
     agenda: agenda.exists() ? (agenda.data().itens ?? []) : [],
     monthMemberships: memberships.exists() ? (memberships.data().itens ?? []) : [],
     recibos: recibos.exists() ? (recibos.data().itens ?? []) : [],
   }
-}
-
-/** Existe algum dado na nuvem? Decide se a primeira entrada oferece migrar. */
-export async function nuvemTemDados(): Promise<boolean> {
-  const people = await getDoc(ref('people'))
-  return people.exists() && (people.data().itens?.length ?? 0) > 0
-}
-
-/**
- * Escuta mudanças feitas em outros aparelhos. Um listener por documento: o
- * Firestore não tem "escutar vários documentos avulsos" numa chamada só.
- *
- * Dois cuidados que evitam trabalho à toa:
- *
- * - O Firestore entrega um snapshot inicial de cada documento assim que o
- *   listener é registrado. Isso é o estado que acabamos de ler, não uma
- *   mudança — ignorar a primeira entrega de cada documento evita reler tudo
- *   seis vezes logo na abertura.
- * - `hasPendingWrites` marca o eco da nossa própria escrita, que volta pelo
- *   listener. Reagir a ele só reescreveria o que já temos.
- */
-export function escutarNuvem(aoMudar: (db: Database) => void): Unsubscribe {
-  const jaChegou = new Set<Colecao>()
-
-  const paradas = COLECOES.map((colecao) =>
-    onSnapshot(ref(colecao), (snap) => {
-      if (!jaChegou.has(colecao)) {
-        jaChegou.add(colecao)
-        return
-      }
-      if (snap.metadata.hasPendingWrites) return
-      void lerDaNuvem().then(aoMudar)
-    }),
-  )
-
-  return () => paradas.forEach((parar) => parar())
 }
