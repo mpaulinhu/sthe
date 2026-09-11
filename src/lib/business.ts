@@ -14,6 +14,40 @@ export function weekOf(iso: string): string[] {
   })
 }
 
+/**
+ * A grade do mês que contém `iso`: sempre semanas inteiras, de domingo a
+ * sábado, então começa antes do dia 1º e termina depois do último dia.
+ *
+ * Os dias vizinhos que entram na conta são de propósito — sem eles a grade
+ * ficaria com buracos nas pontas, e um compromisso na virada do mês
+ * desapareceria da vista. A tela os desenha esmaecidos para não confundir.
+ *
+ * Devolve 35 ou 42 dias (5 ou 6 semanas), conforme o mês se encaixa.
+ */
+export function monthGrid(iso: string): string[] {
+  const [y, m] = iso.split('-').map(Number)
+  const primeiro = new Date(y, m - 1, 1)
+  const ultimo = new Date(y, m, 0)
+
+  const inicio = new Date(primeiro)
+  inicio.setDate(1 - primeiro.getDay())
+
+  const fim = new Date(ultimo)
+  fim.setDate(ultimo.getDate() + (6 - ultimo.getDay()))
+
+  const dias: string[] = []
+  for (const dia = new Date(inicio); dia <= fim; dia.setDate(dia.getDate() + 1)) {
+    dias.push(toIso(dia))
+  }
+  return dias
+}
+
+/** Anda `n` meses a partir de `iso`, sempre caindo no dia 1º. */
+export function addMonths(iso: string, n: number): string {
+  const [y, m] = iso.split('-').map(Number)
+  return toIso(new Date(y, m - 1 + n, 1))
+}
+
 export function toIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }

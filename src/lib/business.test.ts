@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { monthlyComparison, payrollByRole, payrollTotal, weekOf } from './business'
+import {
+  addMonths,
+  monthGrid,
+  monthlyComparison,
+  payrollByRole,
+  payrollTotal,
+  weekOf,
+} from './business'
 import type { Database, Entry } from './types'
 
 function lanc(kind: Entry['kind'], amount: number, over: Partial<Entry> = {}): Entry {
@@ -141,5 +148,65 @@ describe('weekOf', () => {
     expect(semana).toHaveLength(7)
     expect(semana[0]).toBe('2026-09-27')
     expect(semana[6]).toBe('2026-10-03')
+  })
+})
+
+describe('monthGrid', () => {
+  it('sempre entrega semanas inteiras, de domingo a sábado', () => {
+    const grade = monthGrid('2026-09-11')
+    expect(grade.length % 7).toBe(0)
+    expect(new Date(`${grade[0]}T00:00:00`).getDay()).toBe(0)
+    expect(new Date(`${grade[grade.length - 1]}T00:00:00`).getDay()).toBe(6)
+  })
+
+  it('cobre o mês inteiro, do 1º ao último dia', () => {
+    const grade = monthGrid('2026-09-11')
+    expect(grade).toContain('2026-09-01')
+    expect(grade).toContain('2026-09-30')
+  })
+
+  it('completa as pontas com dias dos meses vizinhos', () => {
+    // Setembro de 2026 começa numa terça, então a grade puxa domingo e segunda
+    // de agosto para fechar a primeira semana.
+    const grade = monthGrid('2026-09-11')
+    expect(grade[0]).toBe('2026-08-30')
+    expect(grade[grade.length - 1]).toBe('2026-10-03')
+  })
+
+  it('não repete nem pula dias', () => {
+    const grade = monthGrid('2026-09-11')
+    expect(new Set(grade).size).toBe(grade.length)
+    for (let i = 1; i < grade.length; i++) {
+      const anterior = new Date(`${grade[i - 1]}T00:00:00`)
+      const atual = new Date(`${grade[i]}T00:00:00`)
+      expect((atual.getTime() - anterior.getTime()) / 86400000).toBe(1)
+    }
+  })
+
+  it('funciona em fevereiro de ano bissexto', () => {
+    const grade = monthGrid('2028-02-10')
+    expect(grade).toContain('2028-02-29')
+    expect(grade.length % 7).toBe(0)
+  })
+
+  it('dá o mesmo resultado para qualquer dia do mesmo mês', () => {
+    expect(monthGrid('2026-09-01')).toEqual(monthGrid('2026-09-30'))
+  })
+})
+
+describe('addMonths', () => {
+  it('anda para frente e para trás caindo no dia 1º', () => {
+    expect(addMonths('2026-09-11', 1)).toBe('2026-10-01')
+    expect(addMonths('2026-09-11', -1)).toBe('2026-08-01')
+  })
+
+  it('atravessa a virada do ano', () => {
+    expect(addMonths('2026-12-15', 1)).toBe('2027-01-01')
+    expect(addMonths('2026-01-15', -1)).toBe('2025-12-01')
+  })
+
+  it('não escorrega em mês curto — dia 31 + 1 mês não vira março', () => {
+    // O clássico: `setMonth` sobre o dia 31 em janeiro daria 3 de março.
+    expect(addMonths('2026-01-31', 1)).toBe('2026-02-01')
   })
 })
