@@ -51,7 +51,22 @@ aplicar sem instalar nada:
 > Essa é a regra do "modo de teste" e deixa o banco aberto para qualquer
 > pessoa da internet.
 
-## 4. Conferir
+## 4. Publicar o app (Vercel)
+
+O app é publicado na Vercel, que puxa direto do GitHub. As mesmas variáveis
+do `.env` precisam ser cadastradas lá — sem elas o build sai sem nuvem e o
+app abre em modo local, sem tela de login.
+
+**Vercel** → projeto → **Settings** → **Environment Variables** → cadastrar
+as seis `VITE_FIREBASE_*`.
+
+Depois de publicar, autorize o domínio no Firebase, senão o login é
+recusado com `auth/unauthorized-domain`:
+
+**Firebase Console** → **Authentication** → **Settings** → **Domínios
+autorizados** → **Adicionar domínio** → `seu-projeto.vercel.app`
+
+## 5. Conferir
 
 1. Abra o app: deve aparecer a tela de login.
 2. Entre com o e-mail/senha criados em Authentication → Users.
