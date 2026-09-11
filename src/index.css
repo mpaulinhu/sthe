@@ -48,6 +48,14 @@
   --color-late-soft: #fceaea;
   --color-toast-check: #86dcb4;
 
+  /* ---- Diarista: terceiro tom de contrato ------------------------------
+     Fixo usa blush (o rosé neutro/padrão) e freelancer usa butterfly (o azul
+     da marca) — diarista precisa de uma terceira cor sutil que não brigue com
+     nenhuma semântica de status (paid/due/late). Um sálvia discreto cobre isso
+     sem parecer alerta. */
+  --color-sage-50: #eef3ee;
+  --color-sage-600: #5f7a5e;
+
   /* ---- Tipografia -------------------------------------------------------
      Nunito nos títulos e valores: terminais arredondados mas com peso mais
      encorpado que Quicksand, que pesou pro lado infantil em títulos grandes.

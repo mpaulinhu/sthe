@@ -1,5 +1,5 @@
 import { formatMoney, formatShortDate, monthAbbr, type PersonSummary } from '../lib/calc'
-import { CONTRACT_LABEL, KIND_EFFECT, KIND_LABEL, type Entry, type Receipt } from '../lib/types'
+import { CONTRACT_AVATAR, CONTRACT_LABEL, KIND_EFFECT, KIND_LABEL, type Entry, type Receipt } from '../lib/types'
 
 function initials(name: string): string {
   return name
@@ -14,7 +14,6 @@ function initials(name: string): string {
 const AVATAR_RING = {
   pago: 'bg-paid-soft text-paid ring-paid/15',
   atraso: 'bg-late-soft text-late ring-late/15',
-  neutro: 'bg-blush-50 text-blush-600 ring-blush-200/50',
 } as const
 
 export function PersonRow({
@@ -84,7 +83,14 @@ export function PersonRow({
   const parcial = falta > 0 && pago > 0
   const progresso = total > 0 ? Math.min(100, (pago / total) * 100) : 0
 
-  const tomAvatar = quitado ? AVATAR_RING.pago : atrasado || esquecido ? AVATAR_RING.atraso : AVATAR_RING.neutro
+  // Status (pago/atrasado) tem prioridade sobre o tipo de contrato — é a
+  // informação que pede ação agora. Só em repouso o avatar volta a indicar
+  // se é fixo, freela ou diarista.
+  const tomAvatar = quitado
+    ? AVATAR_RING.pago
+    : atrasado || esquecido
+      ? AVATAR_RING.atraso
+      : CONTRACT_AVATAR[person.contract]
 
   // Quais lançamentos já têm assinatura de recebimento — vira selo na linha.
   const assinados = new Set(recibos.flatMap((r) => r.entryIds))

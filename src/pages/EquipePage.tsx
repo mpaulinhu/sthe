@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader, PlusIcon, PrimaryButton, Vazio } from '../components/Shell'
-import { CONTRACT_LABEL, type ContractType, type Person } from '../lib/types'
+import { CONTRACT_AVATAR, CONTRACT_LABEL, type ContractType, type Person } from '../lib/types'
 import { formatMoney } from '../lib/calc'
 
 const TIPOS: { id: ContractType | 'todos'; label: string }[] = [
@@ -198,7 +198,7 @@ function PersonCard({
     >
       <button onClick={onClick} className="flex min-w-0 flex-1 items-center gap-3.5 text-left">
         <span
-          className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-blush-50 text-[13px] font-semibold text-blush-600 ring-4 ring-blush-200/50"
+          className={`flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full text-[13px] font-semibold ring-4 ${CONTRACT_AVATAR[person.contract]}`}
           aria-hidden
         >
           {initials(person.name)}

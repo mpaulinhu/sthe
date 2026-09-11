@@ -209,6 +209,18 @@ export const CONTRACT_SHORT: Record<ContractType, string> = {
   freelancer: 'Freela',
 }
 
+/**
+ * Cor sutil do avatar por tipo de contrato — para bater o olho e já saber se
+ * é fixo, freela ou diarista, sem precisar ler o texto abaixo do nome. Fixo
+ * fica com o rosé padrão (o neutro da interface); freelancer usa o azul da
+ * marca; diarista usa o sálvia, criado só para essa terceira distinção.
+ */
+export const CONTRACT_AVATAR: Record<ContractType, string> = {
+  fixo: 'bg-blush-50 text-blush-600 ring-blush-200/50',
+  freelancer: 'bg-butterfly-50 text-butterfly-600 ring-butterfly-200/50',
+  diarista: 'bg-sage-50 text-sage-600 ring-sage-600/15',
+}
+
 export const KIND_LABEL: Record<EntryKind, string> = {
   salario: 'Salário',
   diaria: 'Diária',
