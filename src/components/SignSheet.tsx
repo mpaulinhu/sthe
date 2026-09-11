@@ -29,6 +29,8 @@ export function montarTermo(
   method: PaymentMethod,
   period: string,
   payer: Company,
+  quita: boolean,
+  saldoRestante: number,
 ): string {
   // Quem pagou entra no termo por nome e documento. Um recibo que não diz de
   // quem o dinheiro veio prova pouco — e é justamente essa parte que estava
@@ -37,11 +39,20 @@ export function montarTermo(
     ? `de ${payer.name}${payer.doc ? `, inscrita no ${payer.docType === 'cnpj' ? 'CNPJ' : 'CPF'} nº ${maskDoc(payer.doc, payer.docType)}` : ''}, `
     : ''
 
+  // Um vale/adiantamento não quita o mês — dizer "plena e geral quitação"
+  // nesse caso é juridicamente falso e enfraquece o recibo se for contestado.
+  // A quitação declarada precisa ser só do valor recebido agora, com o saldo
+  // do período explicitamente em aberto.
+  const quitacao = quita
+    ? 'dando plena e geral quitação do valor ora recebido'
+    : `dando quitação apenas do valor ora recebido, a título de adiantamento, ` +
+      `permanecendo em aberto o saldo de ${formatMoney(saldoRestante)} referente ao período`
+
   return (
     `Eu, ${nome}, inscrita(o) no CPF nº ${maskCpf(doc)}, DECLARO ter recebido ` +
     `${de}a quantia de ${formatMoney(valor)} (${valorPorExtenso(valor)}), ` +
     `por meio de ${method}, referente aos serviços prestados no período de ` +
-    `${formatPeriod(period)}, dando plena e geral quitação do valor ora recebido. ` +
+    `${formatPeriod(period)}, ${quitacao}. ` +
     `Confirmo que a assinatura abaixo é de meu próprio punho e que assino ` +
     `eletronicamente, de forma livre e consciente, nos termos da Lei nº 14.063/2020.`
   )
@@ -59,6 +70,8 @@ export function SignSheet({
   method,
   period,
   company,
+  quita,
+  saldoRestante,
   onConfirm,
   onClose,
   onError,
@@ -69,6 +82,10 @@ export function SignSheet({
   method: PaymentMethod
   period: string
   company: Company
+  /** Se este pagamento quita tudo que faltava no período, ou é parcial (vale). */
+  quita: boolean
+  /** Quanto ainda falta depois deste pagamento — só relevante quando parcial. */
+  saldoRestante: number
   onConfirm: (r: SignResult) => void
   onClose: () => void
   onError: (msg: string) => void
@@ -86,8 +103,11 @@ export function SignSheet({
   const docErrado = docLimpo.length === 11 && !docOk
 
   const termo = useMemo(
-    () => (docOk ? montarTermo(person.name, docLimpo, valor, method, period, company) : ''),
-    [person.name, docLimpo, docOk, valor, method, period, company],
+    () =>
+      docOk
+        ? montarTermo(person.name, docLimpo, valor, method, period, company, quita, saldoRestante)
+        : '',
+    [person.name, docLimpo, docOk, valor, method, period, company, quita, saldoRestante],
   )
 
   const pronto = docOk && leu && signature !== ''
@@ -141,6 +161,11 @@ export function SignSheet({
         <p className="mt-2.5 text-[12px] text-ink-faint">
           {method} · {formatPeriod(period)}
         </p>
+        {!quita ? (
+          <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-due-soft px-2.5 py-1 text-[11.5px] font-medium text-due">
+            Adiantamento · falta {formatMoney(saldoRestante)}
+          </p>
+        ) : null}
       </div>
 
       {/* Sem os dados de quem paga o recibo sai identificando só um lado. Não

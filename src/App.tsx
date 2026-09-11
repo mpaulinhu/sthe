@@ -59,6 +59,10 @@ type SheetState =
       valor: number
       method: PaymentMethod
       entryIds: string[]
+      /** Se este pagamento quitou tudo que faltava, ou só uma parte (vale). */
+      quita: boolean
+      /** Quanto ainda falta depois deste pagamento — só relevante quando parcial. */
+      saldoRestante: number
     }
   | { mode: 'recibo'; recibo: Receipt }
   | null
@@ -343,6 +347,8 @@ export default function App() {
         valor,
         method: r.method,
         entryIds: quita ? alvos : [idVale],
+        quita,
+        saldoRestante: quita ? 0 : resumo.falta - valor,
       })
       return
     }
@@ -718,6 +724,8 @@ export default function App() {
           method={sheet.method}
           period={period}
           company={db.company}
+          quita={sheet.quita}
+          saldoRestante={sheet.saldoRestante}
           onIrParaConfig={() => {
             setSheet(null)
             setTab('config')
