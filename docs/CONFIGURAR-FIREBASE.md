@@ -51,20 +51,22 @@ aplicar sem instalar nada:
 > Essa é a regra do "modo de teste" e deixa o banco aberto para qualquer
 > pessoa da internet.
 
-## 4. Publicar o app (Vercel)
+## 4. Publicar o app
 
-O app é publicado na Vercel, que puxa direto do GitHub. As mesmas variáveis
-do `.env` precisam ser cadastradas lá — sem elas o build sai sem nuvem e o
-app abre em modo local, sem tela de login.
+```
+npm run deploy
+```
 
-**Vercel** → projeto → **Settings** → **Environment Variables** → cadastrar
-as seis `VITE_FIREBASE_*`.
+Isso gera o build e envia para o Firebase Hosting — o app fica em
+`https://sthe-admin.web.app`.
 
-Depois de publicar, autorize o domínio no Firebase, senão o login é
-recusado com `auth/unauthorized-domain`:
+O domínio `*.web.app` do próprio projeto **já vem autorizado** no
+Authentication, então o login funciona sem passo extra. (Um domínio de fora,
+como `*.vercel.app`, precisaria ser adicionado à mão em Authentication →
+Settings → Domínios autorizados.)
 
-**Firebase Console** → **Authentication** → **Settings** → **Domínios
-autorizados** → **Adicionar domínio** → `seu-projeto.vercel.app`
+O `.env` é lido no momento do build, então **é a sua máquina** que carrega as
+credenciais para dentro do bundle — não há nada para configurar no servidor.
 
 ## 5. Conferir
 
