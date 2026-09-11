@@ -7,8 +7,9 @@ rules_version = '2';
 // usuário: todo mundo autorizado vê os mesmos dados. O que protege é a lista
 // `autorizados` — estar logado NÃO basta, o uid precisa estar lá dentro.
 //
-// Essa lista só pode ser editada pelo Console do Firebase (nenhuma regra
-// permite escrita nela), para ninguém conseguir se auto-autorizar pelo app.
+// Essa lista só pode ser editada por quem já está nela — pela tela de Acessos
+// do app ou pelo Console do Firebase. Ninguém se auto-autoriza: criar conta no
+// Authentication é livre (o app é público), mas não dá acesso a nada sozinho.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -32,11 +33,21 @@ service cloud.firestore {
     // conseguir ler e apagar o que ficou para trás.
     match /sthe/{id}             { allow read, write: if autorizado(); }
 
-    // Lista de quem pode entrar. Leitura só para conferir a própria entrada;
-    // escrita bloqueada para todos — só pelo Console.
+    // Lista de quem pode entrar.
+    //
+    // Leitura: quem já está autorizado vê a lista inteira (é a tela de Acessos);
+    // quem não está só consegue conferir a própria entrada — é o que o app
+    // checa no login para saber se libera ou não.
+    //
+    // Escrita: só quem JÁ está na lista pode convidar ou remover alguém. Essa
+    // condição é a porta de entrada do sistema todo. Qualquer pessoa consegue
+    // criar uma conta no Firebase Authentication (o app é público), mas sem
+    // conseguir gravar aqui ela fica sem acesso a dado nenhum. Se um dia isso
+    // virar `if request.auth != null`, o app inteiro fica aberto a quem achar
+    // o endereço.
     match /autorizados/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false;
+      allow read: if autorizado() || (request.auth != null && request.auth.uid == uid);
+      allow write: if autorizado();
     }
 
     // Qualquer outro caminho é negado por padrão.

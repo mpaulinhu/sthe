@@ -23,6 +23,13 @@ const config = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 }
 
+/**
+ * A mesma configuração, exportada para quem precisa abrir uma instância
+ * secundária do Firebase — criar login sem derrubar a sessão de quem convida
+ * depende disso (ver `acessos.ts`).
+ */
+export const configFirebase = config
+
 /** Só liga a nuvem quando há credencial de verdade — sem isso, modo local. */
 export const nuvemAtiva = Boolean(config.apiKey && config.projectId)
 

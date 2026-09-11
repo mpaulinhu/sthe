@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { PageHeader, Panel } from '../components/Shell'
+import { AcessosPanel } from '../components/AcessosPanel'
 import { Label, Segmented, fieldClass } from '../components/Sheet'
 import { isValidDoc, maskDoc, onlyDigits } from '../lib/receipt'
 import type { Company } from '../lib/types'
@@ -32,12 +33,17 @@ export function ConfiguracoesPage({
   onTrocarTema,
   onSave,
   onError,
+  usuario,
+  onAviso,
 }: {
   company: Company
   tema: Tema
   onTrocarTema: (t: Tema) => void
   onSave: (c: Company) => void
   onError: (msg: string) => void
+  /** `null` quando o app roda só neste aparelho — sem nuvem não há login. */
+  usuario: { uid: string; email: string } | null
+  onAviso: (msg: string) => void
 }) {
   const [name, setName] = useState(company.name)
   const [docType, setDocType] = useState<'cnpj' | 'cpf'>(company.docType)
@@ -260,6 +266,19 @@ export function ConfiguracoesPage({
           </p>
         </Panel>
       </div>
+
+      {/* Acessos só existe com nuvem ligada: sem login não há quem convidar nem
+          lista para mostrar. No modo local o painel simplesmente não aparece. */}
+      {usuario ? (
+        <div className="mt-5">
+          <AcessosPanel
+            meuUid={usuario.uid}
+            meuEmail={usuario.email}
+            onAviso={onAviso}
+            onErro={onError}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-5">
         <Panel title="Aparência">

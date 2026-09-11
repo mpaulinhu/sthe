@@ -751,6 +751,15 @@ export default function App() {
             onTrocarTema={trocarTema}
             onSave={salvarEmpresa}
             onError={flash}
+            usuario={
+              estadoNuvem.modo === 'pronto'
+                ? {
+                    uid: estadoNuvem.usuario.uid,
+                    email: estadoNuvem.usuario.email ?? '',
+                  }
+                : null
+            }
+            onAviso={flash}
           />
         ) : null}
       </main>
