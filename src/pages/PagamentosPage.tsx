@@ -125,6 +125,17 @@ export function PagamentosPage({
     .sort((a, b) => a.dataPagamento.localeCompare(b.dataPagamento))
     .slice(0, 5)
 
+  // "5º dia útil" não é óbvio de cabeça como "todo dia 5" — mostra a regra e
+  // em que dia real ela caiu neste mês, para quem usa esse modo. Agrupa por
+  // Nº (não por pessoa) para não repetir a mesma frase várias vezes.
+  const diasUteisDoMes = Array.from(
+    new Map(
+      summaries
+        .filter((s) => s.person.payDayMode === 'util')
+        .map((s) => [s.person.payDay, s.dataPagamento] as const),
+    ),
+  ).sort((a, b) => a[0] - b[0])
+
   const porFuncao = payrollByRole(db, period).slice(0, 7)
   const maiorFuncao = porFuncao[0]?.total ?? 0
 
@@ -319,6 +330,18 @@ export function PagamentosPage({
                   </select>
                 </div>
               </div>
+
+              {diasUteisDoMes.length > 0 ? (
+                <p className="flex flex-wrap items-center gap-x-1.5 pb-3.5 text-[12px] leading-snug text-ink-faint">
+                  {diasUteisDoMes.map(([nth, data], i) => (
+                    <span key={nth}>
+                      {i > 0 ? ' · ' : ''}
+                      <span className="font-medium text-ink-soft">{nth}º dia útil</span> cai em{' '}
+                      {formatShortDate(data)} neste mês
+                    </span>
+                  ))}
+                </p>
+              ) : null}
 
               {mostrarFiltroTipo ? (
                 <div className="flex flex-wrap items-center gap-1.5 pb-3.5">
