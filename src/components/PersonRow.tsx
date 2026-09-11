@@ -318,46 +318,79 @@ export function PersonRow({
                       {KIND_LABEL[e.kind]}
                       {e.description ? ` · ${desc(e.description)}` : ''}
                     </p>
-                    <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-ink-dim">
-                      <span>{sub}</span>
-                      {e.receiptImage ? (
-                        <button
-                          type="button"
-                          onClick={() => onVerComprovante?.(e)}
-                          className="underline-offset-2 hover:text-butterfly-600 hover:underline"
-                        >
-                          · comprovante anexado
-                        </button>
-                      ) : null}
-                      {assinados.has(e.id) ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-paid-soft px-1.5 py-px font-medium text-paid">
-                          <svg
-                            viewBox="0 0 12 12"
-                            className="h-2.5 w-2.5"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden
+                    <p className="mt-0.5 text-[11.5px] text-ink-dim">{sub}</p>
+
+                    {/* Chips numa linha própria, fora do texto corrido: no
+                        celular um link sublinhado dentro de uma frase pequena
+                        é um alvo de toque ruim — aqui cada ação tem sua área
+                        clicável inteira, alta o bastante pro dedo. */}
+                    {e.receiptImage || assinados.has(e.id) || (e.paid && efeito !== 'abate' && onAssinarDepois) ? (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {e.receiptImage ? (
+                          <button
+                            type="button"
+                            onClick={() => onVerComprovante?.(e)}
+                            className="inline-flex min-h-[30px] items-center gap-1 rounded-full border border-cream-deep bg-white px-2.5 text-[11.5px] font-medium text-ink-soft transition-colors hover:border-butterfly-200 hover:bg-butterfly-50 hover:text-butterfly-600"
                           >
-                            <path d="M2 6.3l2.6 2.6L10 3.2" />
-                          </svg>
-                          assinado
-                        </span>
-                      ) : e.paid && efeito !== 'abate' && onAssinarDepois ? (
-                        // Ela pagou sem colher assinatura na hora (ou desmarcou
-                        // de propósito) — este é o jeito de reconhecer o
-                        // recebimento depois, sem precisar desfazer o pagamento.
-                        <button
-                          type="button"
-                          onClick={() => onAssinarDepois(e)}
-                          className="font-medium text-butterfly-600 underline-offset-2 hover:underline"
-                        >
-                          · assinar recibo
-                        </button>
-                      ) : null}
-                    </p>
+                            <svg
+                              viewBox="0 0 14 14"
+                              className="h-3 w-3"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden
+                            >
+                              <path d="M4 2.5h6l2 2v7a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1Z" />
+                              <path d="M9.5 2.5v2.5H12" />
+                            </svg>
+                            Comprovante
+                          </button>
+                        ) : null}
+
+                        {assinados.has(e.id) ? (
+                          <span className="inline-flex min-h-[30px] items-center gap-1 rounded-full bg-paid-soft px-2.5 text-[11.5px] font-medium text-paid">
+                            <svg
+                              viewBox="0 0 12 12"
+                              className="h-2.5 w-2.5"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden
+                            >
+                              <path d="M2 6.3l2.6 2.6L10 3.2" />
+                            </svg>
+                            Assinado
+                          </span>
+                        ) : e.paid && efeito !== 'abate' && onAssinarDepois ? (
+                          // Ela pagou sem colher assinatura na hora (ou desmarcou
+                          // de propósito) — este é o jeito de reconhecer o
+                          // recebimento depois, sem precisar desfazer o pagamento.
+                          <button
+                            type="button"
+                            onClick={() => onAssinarDepois(e)}
+                            className="inline-flex min-h-[30px] items-center gap-1 rounded-full border border-butterfly-100 bg-butterfly-50 px-2.5 text-[11.5px] font-medium text-butterfly-600 transition-colors hover:border-butterfly-300 hover:bg-butterfly-100"
+                          >
+                            <svg
+                              viewBox="0 0 14 14"
+                              className="h-3 w-3"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                              aria-hidden
+                            >
+                              <path d="M2.5 10.5 9 4l1.5 1.5-6.5 6.5H2.5v-1.5Z" />
+                              <path d="M8 5l1 1" />
+                            </svg>
+                            Assinar recibo
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
 
                   <span
