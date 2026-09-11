@@ -861,6 +861,11 @@ export default function App() {
           <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-ink-dim">
             STHE · Controle interno
           </span>
+          {/* Versão publicada. Sem isso, "o bug continua" e "seu navegador
+              serviu a versão antiga" são indistinguíveis pelo telefone. */}
+          <span className="text-[10.5px] tabular-nums text-ink-dim" title="Versão publicada">
+            v{__BUILD__}
+          </span>
           {__DEMO__ ? (
             <span className="rounded-full bg-blush-100 px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.1em] text-blush-600">
               demonstração

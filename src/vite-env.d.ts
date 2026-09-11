@@ -2,6 +2,8 @@
 
 /** Verdadeiro só no build publicado no GitHub Pages (ver vite.config.ts). */
 declare const __DEMO__: boolean
+/** Data/hora do build — mostrada no rodapé para conferir a versão no celular. */
+declare const __BUILD__: string
 
 /** Credenciais do Firebase — ver `.env.example`. Ausentes = app roda só local. */
 interface ImportMetaEnv {

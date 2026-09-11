@@ -12,6 +12,18 @@ export default defineConfig({
     // Liga o aviso de demonstração só na versão publicada — rodando local,
     // durante o desenvolvimento, ele só atrapalharia.
     __DEMO__: JSON.stringify(Boolean(process.env.GITHUB_PAGES)),
+    // Data e hora do build, no rodapé. Serve para responder à pergunta que
+    // mais atrasa a correção de um bug no celular: "já estou na versão nova
+    // ou o navegador me serviu a antiga do cache?".
+    __BUILD__: JSON.stringify(
+      new Date().toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'America/Sao_Paulo',
+      }),
+    ),
   },
   build: {
     rollupOptions: {
