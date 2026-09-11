@@ -1,0 +1,37 @@
+rules_version = '2';
+
+// Regras do STHE.
+//
+// O banco inteiro é de um negócio só, compartilhado entre poucas pessoas de
+// confiança (a dona e quem ela autorizar). Por isso não há isolamento por
+// usuário: todo mundo autorizado vê os mesmos dados. O que protege é a lista
+// `autorizados` — estar logado NÃO basta, o uid precisa estar lá dentro.
+//
+// Essa lista só pode ser editada pelo Console do Firebase (nenhuma regra
+// permite escrita nela), para ninguém conseguir se auto-autorizar pelo app.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autorizado() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/autorizados/$(request.auth.uid));
+    }
+
+    // Os dados do negócio: um documento por coleção lógica do app.
+    match /sthe/{documento} {
+      allow read, write: if autorizado();
+    }
+
+    // Lista de quem pode entrar. Leitura só para conferir a própria entrada;
+    // escrita bloqueada para todos — só pelo Console.
+    match /autorizados/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Qualquer outro caminho é negado por padrão.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -13,7 +13,10 @@ import { PagamentosPage } from './pages/PagamentosPage'
 import { AgendaPage } from './pages/AgendaPage'
 import { RelatoriosPage } from './pages/RelatoriosPage'
 import { ConfiguracoesPage } from './pages/ConfiguracoesPage'
-import { exportDb, loadDb, parseImportedDb, saveDb, uid } from './lib/storage'
+import { exportDb, parseImportedDb, uid } from './lib/storage'
+import { useCloudDb } from './lib/useCloudDb'
+import { sair } from './lib/auth'
+import { LoginScreen } from './components/LoginScreen'
 import { centsToNumber } from './lib/money'
 import {
   buildFixedSalaries,
@@ -37,7 +40,6 @@ import {
   KIND_LABEL,
   type Company,
   type ContractType,
-  type Database,
   type Entry,
   type PaymentMethod,
   type Person,
@@ -70,7 +72,7 @@ type SheetState =
   | null
 
 export default function App() {
-  const [db, setDb] = useState<Database>(() => loadDb())
+  const { db, setDb, estado: estadoNuvem } = useCloudDb()
   const [tab, setTab] = useState<TabId>('pagamentos')
   const [period, setPeriod] = useState(currentPeriod)
   const [filtro, setFiltro] = useState<FilterKey>('todos')
@@ -82,10 +84,6 @@ export default function App() {
   const [toast, setToast] = useState('')
   const [discreet, setDiscreet] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    saveDb(db)
-  }, [db])
 
   // Todo mundo ativo agora — usado para o que não depende de qual mês está
   // aberto (auto-lançamento, repetir mês anterior).
@@ -552,7 +550,7 @@ export default function App() {
       try {
         const imported = parseImportedDb(String(reader.result))
         if (window.confirm('Isso substitui os dados atuais. Continuar?')) {
-          setDb(imported)
+          setDb(() => imported)
           flash('Dados restaurados.')
         }
       } catch {
@@ -578,6 +576,18 @@ export default function App() {
         showToday={!ehMesAtual}
       />
     )
+
+  // Com nuvem ligada, nada aparece antes de saber quem está entrando: os dados
+  // são folha de pagamento e CPF da equipe. Sem nuvem (modo local), o app abre
+  // direto, como sempre funcionou.
+  if (estadoNuvem.modo === 'carregando') {
+    return (
+      <div className="flex min-h-dvh items-center justify-center text-[13px] text-ink-faint">
+        Abrindo…
+      </div>
+    )
+  }
+  if (estadoNuvem.modo === 'deslogado') return <LoginScreen />
 
   return (
     <div className="flex min-h-screen flex-col text-[15px] text-ink">
@@ -609,6 +619,29 @@ export default function App() {
             >
               <EyeIcon off={discreet} />
             </button>
+
+            {estadoNuvem.modo === 'pronto' ? (
+              <button
+                onClick={() => void sair()}
+                title={`Sair (${estadoNuvem.usuario.email ?? ''})`}
+                aria-label="Sair"
+                className="flex rounded-[10px] p-2 text-ink-faint transition-colors hover:bg-blush-100 hover:text-blush-600"
+              >
+                <svg
+                  viewBox="0 0 18 18"
+                  className="h-[17px] w-[17px]"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  <path d="M7 15.5H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1h3" />
+                  <path d="M11.5 12 15 9l-3.5-3M15 9H7" />
+                </svg>
+              </button>
+            ) : null}
           </>
         }
       />

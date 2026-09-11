@@ -13,4 +13,16 @@ export default defineConfig({
     // durante o desenvolvimento, ele só atrapalharia.
     __DEMO__: JSON.stringify(Boolean(process.env.GITHUB_PAGES)),
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // O SDK do Firebase sozinho é maior que o app inteiro. Num arquivo
+        // próprio, o navegador baixa os dois em paralelo e guarda o do
+        // Firebase em cache entre deploys (ele muda muito menos que o app).
+        manualChunks: {
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+        },
+      },
+    },
+  },
 })

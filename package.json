@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "firebase": "^12.19.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

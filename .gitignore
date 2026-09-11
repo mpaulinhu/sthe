@@ -4,3 +4,10 @@ dist
 *.local
 tsconfig.tsbuildinfo
 exemplo-para-importar.json
+
+# Credenciais do Firebase. As chaves web não são segredo (vão no bundle de
+# qualquer jeito — quem protege os dados são as Security Rules), mas ficam
+# fora do git para cada ambiente ter as suas sem conflito.
+.env
+.env.*
+!.env.example
