@@ -3,6 +3,7 @@ import { PageHeader, Panel } from '../components/Shell'
 import { Label, Segmented, fieldClass } from '../components/Sheet'
 import { isValidDoc, maskDoc, onlyDigits } from '../lib/receipt'
 import type { Company } from '../lib/types'
+import type { Tema } from '../lib/theme'
 
 const DOC_LABEL = { cnpj: 'CNPJ', cpf: 'CPF' } as const
 const DOC_PLACEHOLDER = { cnpj: '00.000.000/0000-00', cpf: '000.000.000-00' } as const
@@ -27,10 +28,14 @@ const DIAS_SEMANA = [
  */
 export function ConfiguracoesPage({
   company,
+  tema,
+  onTrocarTema,
   onSave,
   onError,
 }: {
   company: Company
+  tema: Tema
+  onTrocarTema: (t: Tema) => void
   onSave: (c: Company) => void
   onError: (msg: string) => void
 }) {
@@ -252,6 +257,30 @@ export function ConfiguracoesPage({
 
           <p className="mt-3 text-[12px] text-ink-dim">
             Muda na hora — sem precisar salvar.
+          </p>
+        </Panel>
+      </div>
+
+      <div className="mt-5">
+        <Panel title="Aparência">
+          <p className="text-[12.5px] leading-relaxed text-ink-faint">
+            Vale só para este aparelho — o celular pode ficar escuro e o computador claro.
+          </p>
+
+          <div className="mt-4 max-w-[340px]">
+            <Segmented
+              value={tema}
+              onChange={onTrocarTema}
+              options={[
+                { id: 'claro' as const, label: 'Claro' },
+                { id: 'escuro' as const, label: 'Escuro' },
+                { id: 'sistema' as const, label: 'Automático' },
+              ]}
+            />
+          </div>
+
+          <p className="mt-3 text-[12px] text-ink-dim">
+            No automático, acompanha o que o aparelho já estiver usando.
           </p>
         </Panel>
       </div>

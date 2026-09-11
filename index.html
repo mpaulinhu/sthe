@@ -9,6 +9,29 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <script>
+      // Antes de qualquer pintura: sem isso a página aparece clara e escurece
+      // um instante depois, com um flash branco que incomoda justamente quem
+      // escolheu o modo escuro. Precisa ser inline e síncrono — um módulo
+      // importado já chegaria tarde demais.
+      (function () {
+        try {
+          var salvo = localStorage.getItem('sthe.tema') || 'sistema'
+          var escuro =
+            salvo === 'escuro' ||
+            (salvo === 'sistema' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.dataset.theme = escuro ? 'dark' : 'light'
+          if (escuro) {
+            document
+              .querySelector('meta[name="theme-color"]')
+              .setAttribute('content', '#191318')
+          }
+        } catch (e) {
+          document.documentElement.dataset.theme = 'light'
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

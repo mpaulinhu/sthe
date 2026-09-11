@@ -15,6 +15,7 @@ import { RelatoriosPage } from './pages/RelatoriosPage'
 import { ConfiguracoesPage } from './pages/ConfiguracoesPage'
 import { exportDb, parseImportedDb, uid } from './lib/storage'
 import { useCloudDb } from './lib/useCloudDb'
+import { aplicarTema, lerTema, observarSistema, salvarTema, type Tema } from './lib/theme'
 import { sair } from './lib/auth'
 import { LoginScreen } from './components/LoginScreen'
 import { centsToNumber } from './lib/money'
@@ -83,7 +84,22 @@ export default function App() {
   const [sheet, setSheet] = useState<SheetState>(null)
   const [toast, setToast] = useState('')
   const [discreet, setDiscreet] = useState(false)
+  const [tema, setTema] = useState<Tema>(lerTema)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // O tema já foi aplicado pelo script no index.html, antes da primeira
+  // pintura. Isto aqui mantém em dia depois: quando ela troca a opção, e
+  // quando o próprio sistema muda (só importa no modo automático).
+  useEffect(() => {
+    aplicarTema(tema)
+    if (tema !== 'sistema') return
+    return observarSistema(() => aplicarTema(tema))
+  }, [tema])
+
+  function trocarTema(novo: Tema) {
+    setTema(novo)
+    salvarTema(novo)
+  }
 
   // Todo mundo ativo agora — usado para o que não depende de qual mês está
   // aberto (auto-lançamento, repetir mês anterior).
@@ -729,7 +745,13 @@ export default function App() {
         ) : null}
 
         {tab === 'config' ? (
-          <ConfiguracoesPage company={db.company} onSave={salvarEmpresa} onError={flash} />
+          <ConfiguracoesPage
+            company={db.company}
+            tema={tema}
+            onTrocarTema={trocarTema}
+            onSave={salvarEmpresa}
+            onError={flash}
+          />
         ) : null}
       </main>
 

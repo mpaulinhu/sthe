@@ -69,7 +69,77 @@
   --shadow-lift: 0 2px 6px rgba(150, 69, 95, 0.06), 0 18px 40px -24px rgba(150, 69, 95, 0.32);
 }
 
+/* ---- Modo escuro --------------------------------------------------------
+   Redefine as mesmas variáveis do tema claro. Como toda a interface já lê
+   cor por variável, nenhum componente precisa saber que o modo existe.
+
+   Não é o tema claro invertido: fundo puro preto com texto branco vibra e
+   cansa. A base é um roxo-tinta bem escuro — o mesmo tom da tinta do modo
+   claro, o que mantém o parentesco entre os dois —, e o texto é um creme
+   levemente rosado em vez de branco.
+
+   As cores de status (pago/a pagar/atrasado) clareiam: o tom do modo claro
+   foi escolhido para contrastar com fundo claro e desaparece no escuro. */
+[data-theme='dark'] {
+  /* `white` é a superfície dos cartões e sheets em toda a interface — são 57
+     usos de `bg-white` espalhados. Redefinir a cor aqui é o que faz todos eles
+     escurecerem de uma vez; trocar classe por classe seria demorado e deixaria
+     algum para trás, com texto claro sobre fundo branco. */
+  --color-white: #241c23;
+
+  --color-ink: #f4ecef;
+  --color-ink-soft: #cdbfc6;
+  --color-ink-faint: #9d8d96;
+  --color-ink-dim: #776872;
+  --color-ink-off: #5f525b;
+  --color-ink-hover: #ffffff;
+
+  --color-butterfly-50: #1a2637;
+  --color-butterfly-100: #22344b;
+  --color-butterfly-200: #2f4a6b;
+  --color-butterfly-400: #6ba3e0;
+  --color-butterfly-500: #82b4ea;
+  --color-butterfly-600: #a3c9f2;
+  --color-butterfly-700: #c6defa;
+
+  --color-blush-50: #2a2028;
+  --color-blush-100: #362a33;
+  --color-blush-200: #4a3944;
+  --color-blush-300: #6b5260;
+  --color-blush-400: #c98da2;
+  --color-blush-500: #dda3b6;
+  --color-blush-600: #ecbccb;
+
+  --color-cream: #191318;
+  --color-cream-deep: #322630;
+  --color-hair: #2b2129;
+  --color-surface-sunken: #140f13;
+  --color-line: #453541;
+
+  --color-paid: #6dc99b;
+  --color-paid-soft: #1b3329;
+  --color-due: #d9a94e;
+  --color-due-soft: #332812;
+  --color-late: #e88b8b;
+  --color-late-soft: #3a2121;
+  --color-toast-check: #86dcb4;
+
+  --color-sage-50: #232b23;
+  --color-sage-600: #9dba9c;
+
+  /* No escuro, sombra preta não aparece contra fundo escuro — o que separa
+     uma superfície da outra é ela ser mais clara, não a sombra. Por isso as
+     sombras ficam bem mais sutis e a borda faz o trabalho. */
+  --shadow-petal: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px -18px rgba(0, 0, 0, 0.5);
+  --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.36), 0 18px 40px -24px rgba(0, 0, 0, 0.6);
+}
+
 html, body, #root { height: 100%; }
+
+/* Diz ao navegador em que tema estamos: acerta a cor dos controles nativos
+   (campos de data, barras de rolagem, menus de select) sem estilizar cada um. */
+html { color-scheme: light; }
+html[data-theme='dark'] { color-scheme: dark; }
 
 body {
   color: var(--color-ink);
@@ -84,6 +154,14 @@ body {
     radial-gradient(58rem 40rem at 12% -8%, rgba(227, 170, 184, 0.22), transparent 62%),
     radial-gradient(46rem 34rem at 105% 4%, rgba(179, 205, 240, 0.24), transparent 60%);
   background-attachment: fixed;
+}
+
+/* Os mesmos halos, bem mais fracos: no escuro eles viram manchas se mantiverem
+   a opacidade do claro. */
+[data-theme='dark'] body {
+  background-image:
+    radial-gradient(58rem 40rem at 12% -8%, rgba(201, 141, 162, 0.10), transparent 62%),
+    radial-gradient(46rem 34rem at 105% 4%, rgba(107, 163, 224, 0.10), transparent 60%);
 }
 
 .font-display {
@@ -102,7 +180,7 @@ body {
   border-radius: 4px;
 }
 
-::selection { background: var(--color-blush-100); }
+::selection { background: var(--color-blush-100); color: var(--color-ink); }
 
 input::placeholder,
 textarea::placeholder { color: var(--color-ink-dim); }

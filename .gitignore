@@ -11,3 +11,6 @@ exemplo-para-importar.json
 .env
 .env.*
 !.env.example
+
+# Cache local do CLI do Firebase (registro do que já foi enviado no deploy).
+.firebase/
