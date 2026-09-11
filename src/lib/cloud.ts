@@ -29,13 +29,29 @@ function ref(colecao: Colecao) {
  */
 export async function salvarNaNuvem(db: Database): Promise<void> {
   await Promise.all([
-    setDoc(ref('company'), db.company),
-    setDoc(ref('people'), { itens: db.people }),
-    setDoc(ref('entries'), { itens: db.entries }),
-    setDoc(ref('agenda'), { itens: db.agenda }),
-    setDoc(ref('monthMemberships'), { itens: db.monthMemberships }),
-    setDoc(ref('recibos'), { itens: db.recibos }),
+    setDoc(ref('company'), semUndefined(db.company)),
+    setDoc(ref('people'), { itens: semUndefined(db.people) }),
+    setDoc(ref('entries'), { itens: semUndefined(db.entries) }),
+    setDoc(ref('agenda'), { itens: semUndefined(db.agenda) }),
+    setDoc(ref('monthMemberships'), { itens: semUndefined(db.monthMemberships) }),
+    setDoc(ref('recibos'), { itens: semUndefined(db.recibos) }),
   ])
+}
+
+/**
+ * O Firestore rejeita `undefined` em qualquer campo — e os tipos do app estão
+ * cheios de opcionais (`method`, `doc`, `photo`, `payDayMode`, `receiptImage`).
+ * Uma pessoa sem foto bastava para a gravação inteira falhar.
+ *
+ * Passar pelo JSON resolve porque `JSON.stringify` descarta chaves com
+ * `undefined`, e de quebra garante que só vai tipo serializável — o banco todo
+ * já é feito de objetos simples vindos do localStorage.
+ *
+ * Exportada para ter teste próprio: um campo opcional novo em `types.ts`
+ * quebraria a sincronização inteira de novo, e em silêncio.
+ */
+export function semUndefined<T>(valor: T): T {
+  return JSON.parse(JSON.stringify(valor))
 }
 
 /** Lê o banco inteiro da nuvem. Coleção ausente vira lista vazia. */
@@ -64,12 +80,29 @@ export async function nuvemTemDados(): Promise<boolean> {
 /**
  * Escuta mudanças feitas em outros aparelhos. Um listener por documento: o
  * Firestore não tem "escutar vários documentos avulsos" numa chamada só.
+ *
+ * Dois cuidados que evitam trabalho à toa:
+ *
+ * - O Firestore entrega um snapshot inicial de cada documento assim que o
+ *   listener é registrado. Isso é o estado que acabamos de ler, não uma
+ *   mudança — ignorar a primeira entrega de cada documento evita reler tudo
+ *   seis vezes logo na abertura.
+ * - `hasPendingWrites` marca o eco da nossa própria escrita, que volta pelo
+ *   listener. Reagir a ele só reescreveria o que já temos.
  */
 export function escutarNuvem(aoMudar: (db: Database) => void): Unsubscribe {
-  const paradas = COLECOES.map((c) =>
-    onSnapshot(ref(c), () => {
+  const jaChegou = new Set<Colecao>()
+
+  const paradas = COLECOES.map((colecao) =>
+    onSnapshot(ref(colecao), (snap) => {
+      if (!jaChegou.has(colecao)) {
+        jaChegou.add(colecao)
+        return
+      }
+      if (snap.metadata.hasPendingWrites) return
       void lerDaNuvem().then(aoMudar)
     }),
   )
+
   return () => paradas.forEach((parar) => parar())
 }

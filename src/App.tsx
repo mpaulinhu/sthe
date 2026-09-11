@@ -72,7 +72,7 @@ type SheetState =
   | null
 
 export default function App() {
-  const { db, setDb, estado: estadoNuvem } = useCloudDb()
+  const { db, setDb, estado: estadoNuvem, erroNuvem } = useCloudDb()
   const [tab, setTab] = useState<TabId>('pagamentos')
   const [period, setPeriod] = useState(currentPeriod)
   const [filtro, setFiltro] = useState<FilterKey>('todos')
@@ -645,6 +645,17 @@ export default function App() {
           </>
         }
       />
+
+      {/* Falha de nuvem precisa ser visível: os dados continuam salvos no
+          aparelho, mas deixar isso silencioso é como parecer sincronizado
+          quando não está — pior do que não ter nuvem nenhuma. */}
+      {erroNuvem ? (
+        <div className="mx-auto w-full max-w-[1280px] px-4 pt-3 sm:px-7">
+          <p className="rounded-[12px] border border-late/25 bg-late-soft px-3.5 py-2.5 text-[12.5px] leading-relaxed text-ink-soft">
+            {erroNuvem}
+          </p>
+        </div>
+      ) : null}
 
       <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 pb-16 sm:px-7">
         {tab === 'equipe' ? (
