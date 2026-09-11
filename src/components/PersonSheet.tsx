@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Sheet, Label, Segmented, fieldClass } from './Sheet'
 import { MoneyInput } from './MoneyInput'
 import { centsToNumber, numberToCents } from '../lib/money'
-import { formatShortDate, resolvePayDate } from '../lib/calc'
+import { formatMoney, formatShortDate, resolvePayDate } from '../lib/calc'
 import {
   CONTRACT_SHORT,
   PAYMENT_METHODS,
@@ -68,6 +68,13 @@ export function PersonSheet({
   const [cents, setCents] = useState(numberToCents(initial?.baseAmount ?? 0))
   const [payDay, setPayDay] = useState(initial ? String(initial.payDay) : '')
   const [payDayMode, setPayDayMode] = useState<PayDayMode>(initial?.payDayMode ?? 'fixo')
+  // Vale: opcional, e por isso começa desligado em quem nunca teve um.
+  const [temVale, setTemVale] = useState(Boolean(initial?.advance))
+  const [valeDia, setValeDia] = useState(initial?.advance ? String(initial.advance.day) : '20')
+  const [valeModo, setValeModo] = useState<PayDayMode>(initial?.advance?.mode ?? 'fixo')
+  const [valePercent, setValePercent] = useState(
+    initial?.advance ? String(initial.advance.percent) : '40',
+  )
   const [method, setMethod] = useState<PaymentMethod>(initial?.method ?? 'Pix')
   const [doc, setDoc] = useState(initial?.doc ? maskCpf(initial.doc) : '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
@@ -121,6 +128,13 @@ export function PersonSheet({
       baseAmount: centsToNumber(cents),
       payDay: diaDigitado,
       payDayMode,
+      advance: temVale
+        ? {
+            day: Math.min(31, Math.max(1, Number(valeDia) || 20)),
+            mode: valeModo,
+            percent: Math.min(99, Math.max(1, Number(valePercent) || 40)),
+          }
+        : undefined,
       method,
       doc: docLimpo || undefined,
       photo: photo || undefined,
@@ -272,6 +286,78 @@ export function PersonSheet({
             ? `Este mês não tem dia ${diaDigitado} — cai em ${formatShortDate(dataResolvida)}.`
             : `Neste mês, cai em ${formatShortDate(dataResolvida)}.`}
         </p>
+      </div>
+
+      {/* Vale: um segundo pagamento no meio do mês.
+          Percentual do salário, não valor em reais — assim um aumento não
+          deixa o adiantamento defasado sem ninguém perceber. */}
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => setTemVale(!temVale)}
+          aria-pressed={temVale}
+          className="flex items-center gap-2.5 self-start text-left"
+        >
+          <span
+            className={`flex h-[22px] w-[38px] shrink-0 items-center rounded-full px-[3px] transition-colors ${
+              temVale ? 'bg-butterfly-500' : 'bg-cream-deep'
+            }`}
+          >
+            <span
+              className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                temVale ? 'translate-x-[16px]' : ''
+              }`}
+            />
+          </span>
+          <span className="text-[13.5px] text-ink-soft">Paga vale no meio do mês</span>
+        </button>
+
+        {temVale ? (
+          <div className="mt-1 flex flex-col gap-3 rounded-[12px] border border-cream-deep bg-cream px-3.5 py-3">
+            <Segmented options={PAY_DAY_MODES} value={valeModo} onChange={setValeModo} size="sm" />
+
+            <div className="flex items-center gap-3">
+              <div className="w-[80px]">
+                <input
+                  value={valeDia}
+                  onChange={(e) => setValeDia(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  inputMode="numeric"
+                  placeholder="20"
+                  aria-label={valeModo === 'util' ? 'Nº do dia útil do vale' : 'Dia do vale'}
+                  className={`${fieldClass} text-[15px] tabular-nums`}
+                />
+              </div>
+              <span className="text-[12.5px] leading-snug text-ink-faint">
+                {valeModo === 'util'
+                  ? `${Number(valeDia) || 20}º dia útil`
+                  : `todo dia ${Number(valeDia) || 20}`}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-[80px]">
+                <input
+                  value={valePercent}
+                  onChange={(e) => setValePercent(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                  inputMode="numeric"
+                  placeholder="40"
+                  aria-label="Percentual do salário no vale"
+                  className={`${fieldClass} text-[15px] tabular-nums`}
+                />
+              </div>
+              <span className="text-[12.5px] leading-snug text-ink-faint">
+                % do salário
+                {centsToNumber(cents) > 0 ? (
+                  <strong className="ml-1 font-medium text-ink-soft">
+                    {formatMoney(
+                      Math.round(centsToNumber(cents) * ((Number(valePercent) || 0) / 100) * 100) / 100,
+                    )}
+                  </strong>
+                ) : null}
+              </span>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* A forma habitual vira o padrão ao pagar e alimenta o resumo de

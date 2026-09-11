@@ -153,16 +153,24 @@ export function PersonRow({
           </button>
         ) : null}
 
+        {/* A data que vem primeiro: o vale enquanto ele não chegou, o salário
+            depois. Mostrar as duas na mesma linha carregaria demais — o que
+            ela precisa saber é o que vem agora. O rótulo "vale" identifica
+            qual das duas está ali. */}
         <div className="w-[36px] shrink-0 text-center">
           <p
             className={`font-display text-[17px] font-semibold leading-none tabular-nums ${
               atrasado || esquecido ? 'text-late' : 'text-ink-soft'
             }`}
           >
-            {summary.dataPagamento.slice(8, 10)}
+            {summary.proximaData.slice(8, 10)}
           </p>
-          <p className="mt-1 text-[9.5px] font-medium uppercase tracking-[0.1em] text-ink-dim">
-            {monthAbbr(period)}
+          <p
+            className={`mt-1 text-[9.5px] font-medium uppercase tracking-[0.1em] ${
+              summary.proximaEhVale ? 'text-butterfly-500' : 'text-ink-dim'
+            }`}
+          >
+            {summary.proximaEhVale ? 'vale' : monthAbbr(period)}
           </p>
         </div>
 
@@ -179,6 +187,11 @@ export function PersonRow({
             <span className={CONTRACT_TEXT[person.contract] || undefined}>
               {CONTRACT_LABEL[person.contract]}
             </span>
+            {/* Quanto sai no vale, só quando ele é a próxima data — fora
+                disso é ruído sobre um pagamento que já passou. */}
+            {summary.proximaEhVale ? (
+              <span className="text-butterfly-500"> · vale {formatMoney(summary.valorVale)}</span>
+            ) : null}
             {/* A forma aparece só enquanto há o que pagar: depois de quitado
                 ela vira ruído, e o detalhe já mostra como cada parte saiu. */}
             {person.method && falta > 0 ? (

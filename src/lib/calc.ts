@@ -31,6 +31,22 @@ export interface PersonSummary {
    * cru, que pode apontar para um dia que não existe neste mês.
    */
   dataPagamento: string
+  /**
+   * A data do adiantamento neste período, ou '' quando a pessoa não tem vale.
+   * Separada de `dataPagamento` porque as duas convivem: o vale sai no meio do
+   * mês e o salário no dia combinado.
+   */
+  dataVale: string
+  /** Quanto sai no vale (percentual do salário). Zero quando não há vale. */
+  valorVale: number
+  /**
+   * A próxima data que importa: o vale enquanto ele não saiu, o salário depois
+   * disso. É o que a lista mostra — duas datas na mesma linha poluiriam, e o
+   * que a pessoa precisa saber é "o que vem agora".
+   */
+  proximaData: string
+  /** `true` quando `proximaData` é a do vale, para a lista poder rotular. */
+  proximaEhVale: boolean
 }
 
 export interface MonthSummary {
@@ -160,6 +176,8 @@ export function summarizePerson(
   // a data real resolvida (não o número cru do cadastro) — um "dia 31"
   // cadastrado não pode vencer cedo demais num mês que só tem 30.
   const dataPagamento = resolvePayDate(period, person, workDays)
+  const dataVale = resolveAdvanceDate(period, person, workDays)
+  const valorVale = advanceAmount(person)
   const hoje = todayIso()
   const mesAtual = hoje.slice(0, 7)
   let venceu: boolean
@@ -176,6 +194,13 @@ export function summarizePerson(
     pago,
     falta,
     dataPagamento,
+    dataVale,
+    valorVale,
+    // O vale só é "a próxima" enquanto ainda não chegou o dia dele. Depois
+    // disso o que interessa é o salário, mesmo que o vale não tenha sido pago
+    // — atraso é assunto de `atrasado`, não da data que a lista mostra.
+    proximaData: dataVale && hoje <= dataVale ? dataVale : dataPagamento,
+    proximaEhVale: Boolean(dataVale) && hoje <= dataVale,
     quitado: total > 0 && falta === 0,
     atrasado,
     venceu,
@@ -203,8 +228,10 @@ export function sortSummaries(list: PersonSummary[], sort: SortKey): PersonSumma
     // Compara pelo dia do mês da data real (não o mês/ano inteiro): dois
     // períodos diferentes não fazem sentido misturados numa mesma lista, e
     // comparar a data completa ordenaria por mês antes de por dia.
-    const diaA = Number(a.dataPagamento.slice(8, 10))
-    const diaB = Number(b.dataPagamento.slice(8, 10))
+    // Ordena pela data que a linha mostra, senão quem tem vale apareceria
+    // fora de lugar em relação ao número exibido ao lado do nome.
+    const diaA = Number(a.proximaData.slice(8, 10))
+    const diaB = Number(b.proximaData.slice(8, 10))
     return diaA - diaB || byName(a, b)
   })
 }
@@ -411,6 +438,27 @@ export function resolvePayDate(
   return person.payDayMode === 'util'
     ? nthWorkDayInPeriod(period, person.payDay, workDays)
     : dayInPeriod(period, person.payDay)
+}
+
+/**
+ * A data do adiantamento neste período, ou '' quando a pessoa não tem vale.
+ */
+export function resolveAdvanceDate(
+  period: string,
+  person: Pick<Person, 'advance'>,
+  workDays: number[] = DEFAULT_WORK_DAYS,
+): string {
+  const v = person.advance
+  if (!v) return ''
+  return v.mode === 'util'
+    ? nthWorkDayInPeriod(period, v.day, workDays)
+    : dayInPeriod(period, v.day)
+}
+
+/** Quanto sai no vale: percentual do salário, arredondado ao centavo. */
+export function advanceAmount(person: Pick<Person, 'advance' | 'baseAmount'>): number {
+  if (!person.advance) return 0
+  return Math.round(person.baseAmount * (person.advance.percent / 100) * 100) / 100
 }
 
 /** Mantém o dia, troca o mês/ano — respeitando meses mais curtos (31 → 28/30). */

@@ -27,6 +27,22 @@ export interface Person {
   /** Como `payDay` deve ser interpretado. Ausente = 'fixo', para não quebrar cadastros antigos. */
   payDayMode?: PayDayMode
   /**
+   * Adiantamento no meio do mês.
+   *
+   * Ausente quando a pessoa recebe de uma vez só — que é o caso mais comum, e
+   * por isso o campo é opcional em vez de um `temVale: false` em todo cadastro.
+   *
+   * O valor é percentual do salário, não um número em reais: assim um aumento
+   * não deixa o vale defasado sem ninguém perceber.
+   */
+  advance?: {
+    /** Dia do mês, ou o Nº do dia útil — mesma leitura de `payDay`. */
+    day: number
+    mode?: PayDayMode
+    /** Quanto do salário sai adiantado. 1 a 99. */
+    percent: number
+  }
+  /**
    * Como essa pessoa costuma receber. Vira o padrão ao pagar (dá para trocar
    * na hora sem mexer no cadastro) e alimenta o resumo de quanto separar em
    * dinheiro vivo. Opcional: quem nunca definiu fica sem forma padrão.

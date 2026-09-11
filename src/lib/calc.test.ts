@@ -11,6 +11,8 @@ import {
   statusOf,
   summarizeMonth,
   summarizePerson,
+  advanceAmount,
+  resolveAdvanceDate,
 } from './calc'
 import type { Entry, EntryKind, Person } from './types'
 
@@ -664,5 +666,47 @@ describe('peopleVisibleInPeriod', () => {
       // Fixo fora da janela cadastro→saída não aparece mesmo com membership.
       expect(peopleVisibleInPeriod([ana], [], '2020-01', memberships)).toEqual([])
     })
+  })
+})
+
+describe('vale (adiantamento)', () => {
+  const comVale = (advance: Person['advance']) =>
+    ({ baseAmount: 2000, advance }) as Person
+
+  it('sem vale cadastrado, não há data nem valor', () => {
+    const p = comVale(undefined)
+    expect(resolveAdvanceDate('2026-09', p)).toBe('')
+    expect(advanceAmount(p)).toBe(0)
+  })
+
+  it('calcula o percentual sobre o salário', () => {
+    expect(advanceAmount(comVale({ day: 20, percent: 40 }))).toBe(800)
+    expect(advanceAmount(comVale({ day: 20, percent: 50 }))).toBe(1000)
+  })
+
+  it('arredonda ao centavo em percentual quebrado', () => {
+    // 2000 * 33% = 660 exato; 1999 * 33% = 659,67 — o que não pode é sobrar
+    // fração de centavo num valor que vai para um recibo.
+    const p = { baseAmount: 1999, advance: { day: 20, percent: 33 } } as Person
+    expect(advanceAmount(p)).toBe(659.67)
+  })
+
+  it('resolve o dia fixo dentro do período', () => {
+    expect(resolveAdvanceDate('2026-09', comVale({ day: 20, percent: 40 }))).toBe('2026-09-20')
+  })
+
+  it('respeita mês curto — dia 31 em fevereiro cai no último dia', () => {
+    const data = resolveAdvanceDate('2026-02', comVale({ day: 31, percent: 40 }))
+    expect(data).toBe('2026-02-28')
+  })
+
+  it('resolve por dia útil quando o modo pede', () => {
+    // Setembro de 2026 começa numa terça; o 5º dia útil é dia 7 (seg-sex).
+    const data = resolveAdvanceDate(
+      '2026-09',
+      comVale({ day: 5, mode: 'util', percent: 40 }),
+      [1, 2, 3, 4, 5],
+    )
+    expect(data).toBe('2026-09-07')
   })
 })
