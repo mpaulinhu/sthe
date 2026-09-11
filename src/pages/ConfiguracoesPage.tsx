@@ -267,18 +267,26 @@ export function ConfiguracoesPage({
         </Panel>
       </div>
 
-      {/* Acessos só existe com nuvem ligada: sem login não há quem convidar nem
-          lista para mostrar. No modo local o painel simplesmente não aparece. */}
-      {usuario ? (
-        <div className="mt-5">
+      {/* Acessos depende da nuvem: sem login não há quem convidar nem lista para
+          mostrar. No modo local o painel não some calado — explica por quê, ou
+          fica parecendo que a seção não existe. */}
+      <div className="mt-5">
+        {usuario ? (
           <AcessosPanel
             meuUid={usuario.uid}
             meuEmail={usuario.email}
             onAviso={onAviso}
             onErro={onError}
           />
-        </div>
-      ) : null}
+        ) : (
+          <Panel title="Acessos">
+            <p className="text-[12.5px] leading-relaxed text-ink-faint">
+              Este aparelho está guardando tudo localmente, sem conta. Os acessos só existem
+              quando o app está ligado à nuvem — é lá que ficam os logins.
+            </p>
+          </Panel>
+        )}
+      </div>
 
       <div className="mt-5">
         <Panel title="Aparência">
