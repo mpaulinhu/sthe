@@ -1,16 +1,51 @@
-import type { Database, Entry, Person } from './types'
+import {
+  EMPTY_COMPANY,
+  type AgendaItem,
+  type Company,
+  type Database,
+  type Entry,
+  type MonthMembership,
+  type Person,
+  type Receipt,
+} from './types'
 
 const KEY = 'sthe.pagamentos.v1'
 
-const EMPTY: Database = { version: 2, people: [], entries: [] }
+const EMPTY: Database = {
+  version: 7,
+  company: EMPTY_COMPANY,
+  people: [],
+  entries: [],
+  agenda: [],
+  monthMemberships: [],
+  recibos: [],
+}
 
 /**
  * v1 → v2: `adiantamento` virou `vale` (mesmo efeito: antecipa parte do total).
- * Bancos gravados antes dessa mudança ainda trazem o nome antigo; sem a
- * conversão o lançamento cairia num tipo inexistente e sumiria da conta.
+ * v2 → v3: entrou a agenda (`shifts`).
+ * v3 → v4: `shifts` virou `agenda`. Um item passou a ter `kind` por uma
+ * versão intermediária — o campo é só descartado aqui, sem distinção de tipo.
+ * v4 → v5: entrou `monthMemberships`, para "readicionar" ao mês um freela ou
+ * diarista que já trabalhou antes. Bancos anteriores não têm essa lista —
+ * entra vazia, sem perder nada do que já existia.
+ * v5 → v6: entraram os recibos assinados (`recibos`) e o CPF no cadastro.
+ * Pagamentos antigos continuam válidos como registro — só não têm recibo
+ * assinado, o que é correto: ninguém assinou nada na época.
+ * v6 → v7: entraram os dados de quem paga (`company`), que antes estavam
+ * chumbados no código. Recibos da v6 não têm o pagador congelado — ficam com
+ * o campo vazio, sinalizando que foram emitidos antes desse dado existir.
  */
 function migrate(raw: unknown): Database {
-  const db = raw as { people?: Person[]; entries?: (Omit<Entry, 'kind'> & { kind: string })[] }
+  const db = raw as {
+    company?: Partial<Company>
+    people?: Person[]
+    entries?: (Omit<Entry, 'kind'> & { kind: string })[]
+    shifts?: (AgendaItem & { kind?: string })[]
+    agenda?: (AgendaItem & { kind?: string })[]
+    monthMemberships?: MonthMembership[]
+    recibos?: Receipt[]
+  }
   if (!db || !Array.isArray(db.people) || !Array.isArray(db.entries)) return EMPTY
 
   const entries = db.entries.map((e) => {
@@ -18,7 +53,17 @@ function migrate(raw: unknown): Database {
     return { ...e, kind } as Entry
   })
 
-  return { version: 2, people: db.people, entries }
+  const rawAgenda = db.agenda ?? db.shifts ?? []
+  const agenda = rawAgenda.map(({ kind: _kind, ...item }) => item) as AgendaItem[]
+
+  const monthMemberships = Array.isArray(db.monthMemberships) ? db.monthMemberships : []
+  const recibos = Array.isArray(db.recibos) ? db.recibos : []
+  // Campo a campo em vez de espalhar o objeto salvo: um backup antigo pode ter
+  // só parte das chaves, e o resto precisa cair no padrão em vez de virar
+  // `undefined` dentro de um campo que a interface promete existir.
+  const company: Company = { ...EMPTY_COMPANY, ...(db.company ?? {}) }
+
+  return { version: 7, company, people: db.people, entries, agenda, monthMemberships, recibos }
 }
 
 export function loadDb(): Database {

@@ -102,28 +102,64 @@ export function EmptyState({
   )
 }
 
+/**
+ * A borboleta da marca, redesenhada a partir da logo da cliente: asas em
+ * degradê (a de cima maior e mais aberta, a de baixo em gota), corpo fino e
+ * antenas curvas. O gradiente recebe um id único por instância — dois SVGs na
+ * mesma página não podem disputar o mesmo `id`.
+ */
+let markSeq = 0
+
 export function ButterflyMark({ className = 'h-7 w-7' }: { className?: string }) {
+  const gid = `bfly-${(markSeq = (markSeq + 1) % 1e6)}`
+
   return (
     <svg viewBox="0 0 48 48" className={className} aria-hidden fill="none">
+      <defs>
+        <linearGradient id={gid} x1="8" y1="6" x2="40" y2="42" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#5b9ad9" />
+          <stop offset="0.55" stopColor="#2c6fb5" />
+          <stop offset="1" stopColor="#143a66" />
+        </linearGradient>
+      </defs>
+
+      {/* Asas de perfil, como na logo: o par esquerdo aberto e maior, o direito
+          recuado — dá a inclinação de bicho pousado em vez de brasão simétrico.
+          Todas as asas nascem no eixo do corpo (x≈24), sem folga flutuando. */}
       <path
-        d="M24 30c-2.5 5-7.5 9-13 9-4 0-7-2.5-7-6.5 0-6 5-10.5 11-13.5C20 17 23 15 24 12c1 3 4 5 9 7 6 3 11 7.5 11 13.5 0 4-3 6.5-7 6.5-5.5 0-10.5-4-13-9Z"
-        fill="currentColor"
-        className="text-butterfly-500"
+        d="M23.4 22.2C20.3 15.8 15.6 10.4 10.8 8.6 7.3 7.3 4.9 9 5.4 12.6c.7 4.7 5.4 9.6 11.4 11.9 2.5 1 4.8 1.5 6.6 1.6Z"
+        fill={`url(#${gid})`}
       />
       <path
-        d="M24 12v22"
-        stroke="currentColor"
-        strokeWidth="1.6"
+        d="M23.6 25.4c-1.6 5.4-4.7 9.9-8.3 11-2.6.8-4.4-.7-4.1-3.5.4-3.6 4-7.4 9-9.2 1.5-.6 2.7-.9 3.6-.9Z"
+        fill={`url(#${gid})`}
+        opacity="0.78"
+      />
+      <path
+        d="M24.6 22.4c2.9-6 7.1-11 11.4-12.7 3.1-1.2 5.3.3 4.9 3.6-.6 4.3-4.8 8.8-10.2 10.9-2.2.9-4.3 1.4-5.9 1.5Z"
+        fill={`url(#${gid})`}
+        opacity="0.88"
+      />
+      <path
+        d="M24.5 25.5c1.5 4.9 4.2 9 7.5 10 2.4.7 4-.6 3.7-3.2-.4-3.3-3.6-6.8-8.1-8.4-1.3-.5-2.3-.7-3.1-.7Z"
+        fill={`url(#${gid})`}
+        opacity="0.66"
+      />
+
+      {/* Corpo: fuso fino que afina até a ponta. */}
+      <path
+        d="M24 17.8c.8 0 1.3.85 1.3 2.3 0 2.9-.5 7.2-1.3 10.9-.8-3.7-1.3-8-1.3-10.9 0-1.45.5-2.3 1.3-2.3Z"
+        fill="#143a66"
+      />
+      {/* Antenas: finas, abrindo para fora, com a bolinha na ponta. */}
+      <path
+        d="M23.4 18.4c-1.6-2.3-3.6-3.9-5.8-4.6M24.6 18.4c1.5-2.4 3.4-4.1 5.6-5"
+        stroke="#143a66"
+        strokeWidth="0.95"
         strokeLinecap="round"
-        className="text-butterfly-700"
       />
-      <path
-        d="M23 12c-1-3-3-5-5.5-6M25 12c1-3 3-5 5.5-6"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        className="text-butterfly-700"
-      />
+      <circle cx="17.3" cy="13.6" r="0.95" fill="#143a66" />
+      <circle cx="30.5" cy="13.2" r="0.95" fill="#143a66" />
     </svg>
   )
 }

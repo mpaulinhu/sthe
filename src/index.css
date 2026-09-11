@@ -1,63 +1,123 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #1a1d21;
-  --color-ink-soft: #4a5159;
-  --color-ink-faint: #8b939c;
+  /* ---- Tinta ------------------------------------------------------------
+     Não é preto puro: um roxo-tinta bem escuro, que combina com a paleta
+     quente do fundo em vez de brigar com ela. */
+  --color-ink: #2a2028;
+  --color-ink-soft: #5c5059;
+  --color-ink-faint: #918691;
+  --color-ink-dim: #b8adb6;
+  --color-ink-off: #c9c0c7;
+  --color-ink-hover: #40323d;
 
-  --color-butterfly-50: #eef5fc;
-  --color-butterfly-100: #d7e7f7;
-  --color-butterfly-200: #aecfef;
-  --color-butterfly-400: #4a8ccb;
+  /* ---- Azul da borboleta (a marca) -------------------------------------- */
+  --color-butterfly-50: #eef4fc;
+  --color-butterfly-100: #d8e6f8;
+  --color-butterfly-200: #b3cdf0;
+  --color-butterfly-400: #4b8ad2;
   --color-butterfly-500: #2c6fb5;
-  --color-butterfly-600: #1b4f8a;
-  --color-butterfly-700: #133a66;
+  --color-butterfly-600: #1f5490;
+  --color-butterfly-700: #143a66;
 
-  --color-cream: #faf8f4;
-  --color-cream-deep: #f2eee6;
+  /* ---- Rosé: o tom que dá o gênero da interface -------------------------
+     Usado em fundo, bordas e no gradiente do destaque. Discreto o bastante
+     para uma ferramenta de trabalho, quente o bastante para não ser mais um
+     dashboard cinza. */
+  --color-blush-50: #fdf4f5;
+  --color-blush-100: #f9e6ea;
+  --color-blush-200: #f1cfd7;
+  --color-blush-300: #e3aab8;
+  --color-blush-400: #cf7f95;
+  --color-blush-500: #b85c78;
+  --color-blush-600: #96455f;
 
+  /* ---- Superfícies ------------------------------------------------------ */
+  --color-cream: #fdf8f7;
+  --color-cream-deep: #f3e8e9;
+  --color-hair: #f7eef0;
+  --color-surface-sunken: #fdf9f9;
+  --color-line: #e6d5da;
+
+  /* ---- Semânticas ------------------------------------------------------- */
   --color-paid: #2f7d5c;
-  --color-paid-soft: #e6f3ec;
-  --color-due: #b8862a;
-  --color-due-soft: #fbf2dd;
-  --color-late: #b3452f;
-  --color-late-soft: #fbeae6;
+  --color-paid-soft: #e4f2eb;
+  --color-due: #b07d2b;
+  --color-due-soft: #faf0da;
+  --color-late: #c04a4a;
+  --color-late-soft: #fceaea;
+  --color-toast-check: #86dcb4;
 
-  --font-display: "Barlow Condensed", "Barlow", system-ui, sans-serif;
-  --font-sans: "Barlow", system-ui, -apple-system, sans-serif;
+  /* ---- Tipografia -------------------------------------------------------
+     Nunito nos títulos e valores: terminais arredondados mas com peso mais
+     encorpado que Quicksand, que pesou pro lado infantil em títulos grandes.
+     Sora (retos demais) e Quicksand (leve demais) já foram tentadas antes
+     dessa. Outfit segue no corpo. */
+  --font-display: "Nunito", system-ui, -apple-system, sans-serif;
+  --font-sans: "Outfit", system-ui, -apple-system, sans-serif;
 
-  /* Tons de apoio que o handoff usa e que não existiam como token */
-  --color-ink-dim: #b3bac2;
-  --color-ink-off: #a6aeb6;
-  --color-hair: #f5f2ec;
-  --color-surface-sunken: #fdfcfa;
-  --color-line: #ddd8ce;
-  --color-toast-check: #7fd4ab;
-  --color-ink-hover: #33383e;
+  /* ---- Sombras: coloridas, nunca cinza ---------------------------------- */
+  --shadow-petal: 0 1px 2px rgba(150, 69, 95, 0.04), 0 10px 30px -18px rgba(150, 69, 95, 0.22);
+  --shadow-lift: 0 2px 6px rgba(150, 69, 95, 0.06), 0 18px 40px -24px rgba(150, 69, 95, 0.32);
 }
 
 html, body, #root { height: 100%; }
 
 body {
-  background-color: var(--color-cream);
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+
+  /* Atmosfera: dois halos muito suaves (rosé no topo-esquerda, azul da marca
+     no canto oposto) sobre o creme. Fica fixo — a página rola por cima. */
+  background-color: var(--color-cream);
+  background-image:
+    radial-gradient(58rem 40rem at 12% -8%, rgba(227, 170, 184, 0.22), transparent 62%),
+    radial-gradient(46rem 34rem at 105% 4%, rgba(179, 205, 240, 0.24), transparent 60%);
+  background-attachment: fixed;
 }
 
-/* Foco visível padronizado — nunca o azul default do browser (handoff). */
+.font-display {
+  letter-spacing: -0.01em;
+}
+
+/* Números: sempre tabulares e com serifa, para as colunas de dinheiro
+   alinharem e o valor ter presença editorial. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
 :focus-visible {
-  outline: 2px solid var(--color-butterfly-500);
+  outline: 2px solid var(--color-blush-400);
   outline-offset: 2px;
+  border-radius: 4px;
 }
 
-::selection { background: var(--color-butterfly-100); }
+::selection { background: var(--color-blush-100); }
 
 input::placeholder,
 textarea::placeholder { color: var(--color-ink-dim); }
 
+/* Barra de rolagem discreta, na paleta. */
+* { scrollbar-width: thin; scrollbar-color: var(--color-cream-deep) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--color-cream-deep);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--color-blush-200); background-clip: content-box; }
+
+/* ---- Movimento --------------------------------------------------------- */
+
 @keyframes sheetIn {
-  from { transform: translateX(24px); opacity: .4 }
+  from { transform: translateX(28px); opacity: 0 }
+  to { transform: none; opacity: 1 }
+}
+@keyframes sheetUp {
+  from { transform: translateY(32px); opacity: 0 }
   to { transform: none; opacity: 1 }
 }
 @keyframes fadeIn {
@@ -65,10 +125,50 @@ textarea::placeholder { color: var(--color-ink-dim); }
   to { opacity: 1 }
 }
 @keyframes toastIn {
-  from { transform: translate(-50%, 10px); opacity: 0 }
-  to { transform: translate(-50%, 0); opacity: 1 }
+  from { transform: translate(-50%, 14px) scale(.96); opacity: 0 }
+  to { transform: translate(-50%, 0) scale(1); opacity: 1 }
+}
+
+/* Entrada em cascata da lista: cada linha sobe um pouco depois da anterior.
+   O atraso vem de `--i`, setado inline no componente. */
+@keyframes riseIn {
+  from { transform: translateY(10px); opacity: 0 }
+  to { transform: none; opacity: 1 }
+}
+.rise-in {
+  animation: riseIn .5s cubic-bezier(.2, .7, .3, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+/* Números que "assentam" ao entrar — usado no valor principal do mês. */
+@keyframes settleIn {
+  from { transform: translateY(8px) scale(.97); opacity: 0; filter: blur(3px) }
+  to { transform: none; opacity: 1; filter: none }
+}
+
+/* A borboleta da marca respira de leve, o tempo todo. É o único movimento
+   contínuo da tela — o resto só reage a ação. */
+@keyframes flutter {
+  0%, 100% { transform: translateY(0) rotate(0deg) }
+  50% { transform: translateY(-2.5px) rotate(-2.5deg) }
+}
+.flutter { animation: flutter 5s ease-in-out infinite; transform-origin: 60% 70%; }
+
+/* Brilho que atravessa a barra de progresso do mês. */
+@keyframes sheen {
+  from { transform: translateX(-100%) }
+  to { transform: translateX(320%) }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
 }
 
 @media print {
   .no-print { display: none !important; }
+  body { background: #fff }
 }

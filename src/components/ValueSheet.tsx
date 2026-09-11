@@ -3,6 +3,7 @@ import { Sheet, Label, Segmented, fieldClass } from './Sheet'
 import { MoneyInput } from './MoneyInput'
 import { formatMoney } from '../lib/calc'
 import { centsToNumber, numberToCents } from '../lib/money'
+import { compressImage, dataUrlKb } from '../lib/image'
 import {
   KIND_HINT,
   KIND_LABEL,
@@ -22,6 +23,10 @@ export interface ValueResult {
   date: string
   obs: string
   receiptName: string
+  /** Comprovante já comprimido (data URL), quando ela anexou um. */
+  receiptImage: string
+  /** Só no modo 'pagar': seguir para a tela de assinatura depois de registrar. */
+  colherAssinatura: boolean
 }
 
 function todayIso(): string {
@@ -59,19 +64,48 @@ export function ValueSheet({
   // Ela só ajusta quando o mês foge do padrão, em vez de redigitar sempre.
   const [cents, setCents] = useState(mode === 'pagar' ? falta : base)
   const [kind, setKind] = useState<EntryKind>(kindInicial)
-  const [method, setMethod] = useState<PaymentMethod>('Pix')
+  // A forma habitual da pessoa já vem escolhida — trocar aqui vale só para
+  // este pagamento, sem mexer no cadastro dela.
+  const [method, setMethod] = useState<PaymentMethod>(person.method ?? 'Pix')
   const [date, setDate] = useState(todayIso())
   const [obs, setObs] = useState('')
   const [receiptName, setReceiptName] = useState('')
+  const [receiptImage, setReceiptImage] = useState('')
+  const [comprimindo, setComprimindo] = useState(false)
+  // Ao pagar, colher a assinatura é o padrão — é o que dá valor de recibo ao
+  // registro. Dá para desmarcar quando ela não está presente na hora.
+  const [colherAssinatura, setColherAssinatura] = useState(true)
 
   const isPagar = mode === 'pagar'
+
+  async function anexar(file: File | undefined) {
+    if (!file) return
+    setComprimindo(true)
+    try {
+      setReceiptImage(await compressImage(file))
+      setReceiptName(file.name)
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Não consegui anexar essa imagem.')
+    } finally {
+      setComprimindo(false)
+    }
+  }
 
   function confirm() {
     if (cents <= 0) {
       onError('Coloque um valor.')
       return
     }
-    onConfirm({ cents, kind, method, date, obs, receiptName })
+    onConfirm({
+      cents,
+      kind,
+      method,
+      date,
+      obs,
+      receiptName,
+      receiptImage,
+      colherAssinatura: isPagar && colherAssinatura,
+    })
   }
 
   return (
@@ -194,31 +228,115 @@ export function ValueSheet({
       </label>
 
       <div className="flex flex-col gap-2">
-        <Label optional>Comprovante</Label>
-        <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-dashed border-line bg-cream p-[13px] text-[13.5px] text-ink-soft transition-colors hover:border-butterfly-200 hover:bg-butterfly-50">
-          <svg
-            viewBox="0 0 18 18"
-            className="h-4 w-4 shrink-0 text-ink-faint"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            aria-hidden
+        <Label optional>Comprovante do pagamento</Label>
+
+        {receiptImage ? (
+          // Preview: é a confirmação de que anexou o print certo — sem isso ela
+          // só veria um nome de arquivo e descobriria o erro tarde demais.
+          <div className="flex items-start gap-3 rounded-xl border border-cream-deep bg-cream p-2.5">
+            <img
+              src={receiptImage}
+              alt="Comprovante anexado"
+              className="h-[68px] w-[68px] shrink-0 rounded-lg border border-cream-deep object-cover"
+            />
+            <div className="min-w-0 flex-1 pt-0.5">
+              <p className="truncate text-[13px] font-medium">{receiptName}</p>
+              <p className="mt-0.5 text-[11.5px] text-ink-dim">
+                {dataUrlKb(receiptImage)} KB · guardado no aparelho
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setReceiptImage('')
+                  setReceiptName('')
+                }}
+                className="mt-1.5 rounded-md text-[12px] text-ink-faint underline-offset-4 transition-colors hover:text-late hover:underline"
+              >
+                Remover
+              </button>
+            </div>
+          </div>
+        ) : (
+          <label
+            className={`flex items-center gap-2.5 rounded-xl border border-dashed border-line bg-cream p-[13px] text-[13.5px] text-ink-soft transition-colors ${
+              comprimindo
+                ? 'cursor-wait opacity-60'
+                : 'cursor-pointer hover:border-butterfly-200 hover:bg-butterfly-50'
+            }`}
           >
-            <path d="M9 12.5V4M9 4L5.5 7.5M9 4l3.5 3.5" />
-            <path d="M3 12.5v1.5a1 1 0 001 1h10a1 1 0 001-1v-1.5" />
-          </svg>
-          <span className="min-w-0 flex-1 truncate">
-            {receiptName || 'Anexar foto ou PDF'}
-          </span>
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            className="hidden"
-            onChange={(e) => setReceiptName(e.target.files?.[0]?.name ?? '')}
-          />
-        </label>
+            <svg
+              viewBox="0 0 18 18"
+              className="h-4 w-4 shrink-0 text-ink-faint"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              aria-hidden
+            >
+              <path d="M9 12.5V4M9 4L5.5 7.5M9 4l3.5 3.5" />
+              <path d="M3 12.5v1.5a1 1 0 001 1h10a1 1 0 001-1v-1.5" />
+            </svg>
+            <span className="min-w-0 flex-1 truncate">
+              {comprimindo ? 'Preparando a imagem…' : 'Anexar print do Pix ou foto'}
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              disabled={comprimindo}
+              onChange={(e) => {
+                void anexar(e.target.files?.[0])
+                e.target.value = ''
+              }}
+            />
+          </label>
+        )}
       </div>
+
+      {/* Só ao pagar: lançar um valor previsto não tem o que assinar ainda. */}
+      {isPagar ? (
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={colherAssinatura}
+          aria-label="Colher assinatura de recebimento"
+          onClick={() => setColherAssinatura((v) => !v)}
+          className="flex items-start gap-2.5 rounded-[12px] border border-cream-deep bg-cream px-3.5 py-3 text-left transition-colors hover:border-butterfly-200"
+        >
+          <span
+            className={`mt-px flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-md border transition-colors ${
+              colherAssinatura
+                ? 'border-butterfly-500 bg-butterfly-500 text-white'
+                : 'border-line bg-white'
+            }`}
+          >
+            <svg
+              viewBox="0 0 14 14"
+              className="h-2.5 w-2.5"
+              style={{ opacity: colherAssinatura ? 1 : 0 }}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M2.5 7.5l3 3 6-6.5" />
+            </svg>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13.5px] font-medium leading-snug">
+              Colher assinatura de recebimento
+            </span>
+            <span className="mt-0.5 block text-[12px] leading-snug text-ink-dim">
+              {colherAssinatura
+                ? 'Ela assina no seu celular e o recibo é emitido na hora.'
+                : 'Sem assinatura, fica só o seu registro do pagamento.'}
+            </span>
+          </span>
+        </button>
+      ) : null}
 
       <label className="flex flex-col gap-[7px]">
         <Label optional>Observação</Label>

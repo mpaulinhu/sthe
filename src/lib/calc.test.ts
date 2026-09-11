@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { buildGroups, buildRepeatedEntries, sortSummaries, statusOf, summarizeMonth, summarizePerson } from './calc'
+import {
+  buildFixedSalaries,
+  buildGroups,
+  buildRepeatedEntries,
+  peopleVisibleInPeriod,
+  pendingByMethod,
+  sortSummaries,
+  statusOf,
+  summarizeMonth,
+  summarizePerson,
+} from './calc'
 import type { Entry, EntryKind, Person } from './types'
 
 const PERIOD = '2026-08'
@@ -14,7 +24,7 @@ function person(over: Partial<Person> = {}): Person {
     payDay: 5,
     active: true,
     notes: '',
-    createdAt: '',
+    createdAt: `${PERIOD}-01T00:00:00.000Z`,
     ...over,
   }
 }
@@ -332,5 +342,261 @@ describe('venceu x atrasado', () => {
     const s = summarizePerson(person({ payDay: 1 }), [], '2099-01')
     expect(s.venceu).toBe(false)
     expect(s.atrasado).toBe(false)
+  })
+})
+
+describe('buildFixedSalaries', () => {
+  const id = () => `novo${seq++}`
+
+  it('cria o salário de quem é fixo, com o dia de pagar da pessoa', () => {
+    const novos = buildFixedSalaries([], PERIOD, [person({ baseAmount: 2000, payDay: 5 })], id)
+
+    expect(novos).toHaveLength(1)
+    expect(novos[0]).toMatchObject({
+      personId: 'p1',
+      kind: 'salario',
+      amount: 2000,
+      period: PERIOD,
+      date: `${PERIOD}-05`,
+      paid: false,
+    })
+  })
+
+  it('não cria para diarista nem freelancer que não foi adicionado ao mês', () => {
+    // Sem membership eles nem aparecem na lista do mês — criar valor aqui
+    // inventaria uma dívida para alguém que não está trabalhando no período.
+    const gente = [
+      person({ id: 'a', contract: 'diarista', baseAmount: 130 }),
+      person({ id: 'b', contract: 'freelancer', baseAmount: 500 }),
+    ]
+    expect(buildFixedSalaries([], PERIOD, gente, id)).toEqual([])
+  })
+
+  it('cria para freelancer trazido pelo "Adicionar ao mês", com o valor do cadastro', () => {
+    const freela = person({ id: 'b', contract: 'freelancer', baseAmount: 500, payDay: 10 })
+    const novos = buildFixedSalaries([], PERIOD, [freela], id, [
+      { personId: 'b', period: PERIOD },
+    ])
+
+    expect(novos).toHaveLength(1)
+    expect(novos[0]).toMatchObject({
+      personId: 'b',
+      // Freelancer lança "serviço", não "salário" — o rótulo vai para o
+      // recibo e para o relatório por função.
+      kind: 'servico',
+      amount: 500,
+      date: `${PERIOD}-10`,
+      paid: false,
+    })
+  })
+
+  it('cria para diarista adicionada ao mês, como diária', () => {
+    const diarista = person({ id: 'a', contract: 'diarista', baseAmount: 130 })
+    const novos = buildFixedSalaries([], PERIOD, [diarista], id, [
+      { personId: 'a', period: PERIOD },
+    ])
+
+    expect(novos).toHaveLength(1)
+    expect(novos[0]).toMatchObject({ kind: 'diaria', amount: 130 })
+  })
+
+  it('membership de outro mês não traz o valor para este', () => {
+    const freela = person({ id: 'b', contract: 'freelancer', baseAmount: 500 })
+    expect(
+      buildFixedSalaries([], PERIOD, [freela], id, [{ personId: 'b', period: '2026-07' }]),
+    ).toEqual([])
+  })
+
+  it('freelancer sem valor combinado continua sem lançamento', () => {
+    // Valor que varia sempre é o caso normal do freela: aí ela lança à mão, e
+    // adivinhar um número seria pior do que deixar em branco.
+    const freela = person({ id: 'b', contract: 'freelancer', baseAmount: 0 })
+    expect(
+      buildFixedSalaries([], PERIOD, [freela], id, [{ personId: 'b', period: PERIOD }]),
+    ).toEqual([])
+  })
+
+  it('freelancer adicionado que já teve valor lançado não ganha outro', () => {
+    const freela = person({ id: 'b', contract: 'freelancer', baseAmount: 500 })
+    const jaLancou = [{ ...entry('servico', 900, false), personId: 'b' }]
+    expect(
+      buildFixedSalaries(jaLancou, PERIOD, [freela], id, [{ personId: 'b', period: PERIOD }]),
+    ).toEqual([])
+  })
+
+  it('não cria para fixo sem valor combinado', () => {
+    expect(buildFixedSalaries([], PERIOD, [person({ baseAmount: 0 })], id)).toEqual([])
+  })
+
+  it('não cria para pessoa inativa', () => {
+    expect(buildFixedSalaries([], PERIOD, [person({ active: false })], id)).toEqual([])
+  })
+
+  it('respeita quem já tem lançamento no mês, mesmo que não seja salário', () => {
+    // Se ela já lançou qualquer coisa, o mês é "dela" — acrescentar salário
+    // por cima inflaria o total sem ela pedir.
+    const jaLancou = [entry('diaria', 400, false)]
+    expect(buildFixedSalaries(jaLancou, PERIOD, [person()], id)).toEqual([])
+  })
+
+  it('ignora lançamento de outro mês ao decidir', () => {
+    const outroMes = [{ ...entry('salario', 2000, false), period: '2026-07' }]
+    expect(buildFixedSalaries(outroMes, PERIOD, [person()], id)).toHaveLength(1)
+  })
+
+  it('encaixa o dia 31 em mês curto', () => {
+    // Fevereiro de 2026 tem 28 dias — o vencimento cai no último.
+    const novos = buildFixedSalaries([], '2026-02', [person({ payDay: 31 })], id)
+    expect(novos[0].date).toBe('2026-02-28')
+  })
+})
+
+describe('pendingByMethod', () => {
+  function resumo(nome: string, falta: number, method?: Person['method']) {
+    return summarizePerson(
+      person({ id: nome, name: nome, method }),
+      falta > 0 ? [{ ...entry('salario', falta, false), personId: nome }] : [],
+      PERIOD,
+    )
+  }
+
+  it('agrupa o que falta pagar por forma, da maior soma para a menor', () => {
+    const fatias = pendingByMethod([
+      resumo('Ana', 1000, 'Pix'),
+      resumo('Bia', 500, 'Dinheiro'),
+      resumo('Cida', 800, 'Pix'),
+    ])
+
+    expect(fatias).toEqual([
+      { method: 'Pix', total: 1800, pessoas: 2 },
+      { method: 'Dinheiro', total: 500, pessoas: 1 },
+    ])
+  })
+
+  it('quem não tem forma definida cai em "Sem forma"', () => {
+    expect(pendingByMethod([resumo('Ana', 300)])).toEqual([
+      { method: 'Sem forma', total: 300, pessoas: 1 },
+    ])
+  })
+
+  it('ignora quem já está quitado', () => {
+    const quitada = summarizePerson(
+      person({ id: 'q', method: 'Pix' }),
+      [{ ...entry('salario', 900, true), personId: 'q' }],
+      PERIOD,
+    )
+    expect(pendingByMethod([quitada, resumo('Ana', 100, 'Pix')])).toEqual([
+      { method: 'Pix', total: 100, pessoas: 1 },
+    ])
+  })
+
+  it('sem ninguém a pagar, não devolve fatia nenhuma', () => {
+    expect(pendingByMethod([])).toEqual([])
+  })
+})
+
+describe('peopleVisibleInPeriod', () => {
+  describe('fixo', () => {
+    it('aparece no mês do cadastro e nos seguintes', () => {
+      const ana = person({ createdAt: '2026-08-15T00:00:00.000Z' })
+      expect(peopleVisibleInPeriod([ana], [], '2026-08')).toEqual([ana])
+      expect(peopleVisibleInPeriod([ana], [], '2026-09')).toEqual([ana])
+    })
+
+    it('NÃO aparece em mês anterior ao cadastro — o bug relatado', () => {
+      const ana = person({ createdAt: '2026-08-15T00:00:00.000Z' })
+      expect(peopleVisibleInPeriod([ana], [], '2026-07')).toEqual([])
+      expect(peopleVisibleInPeriod([ana], [], '2026-01')).toEqual([])
+    })
+
+    it('some dos meses seguintes à saída, mas continua nos meses em que trabalhou', () => {
+      const ana = person({
+        createdAt: '2026-01-10T00:00:00.000Z',
+        active: false,
+        inactivatedAt: '2026-06-20T00:00:00.000Z',
+      })
+      expect(peopleVisibleInPeriod([ana], [], '2026-05')).toEqual([ana])
+      expect(peopleVisibleInPeriod([ana], [], '2026-06')).toEqual([ana])
+      expect(peopleVisibleInPeriod([ana], [], '2026-07')).toEqual([])
+    })
+
+    it('inativo sem `inactivatedAt` (cadastro antigo) não aparece em mês nenhum', () => {
+      const ana = person({ active: false, inactivatedAt: undefined })
+      expect(peopleVisibleInPeriod([ana], [], PERIOD)).toEqual([])
+    })
+  })
+
+  describe('diarista e freelancer', () => {
+    it('só aparece no mês em que teve lançamento', () => {
+      const helena = person({ id: 'h', contract: 'diarista', createdAt: '2026-01-01T00:00:00.000Z' })
+      const lancamentoEmAgosto = [{ ...entry('diaria', 130, false), personId: 'h' }]
+
+      expect(peopleVisibleInPeriod([helena], lancamentoEmAgosto, PERIOD)).toEqual([helena])
+      expect(peopleVisibleInPeriod([helena], lancamentoEmAgosto, '2026-09')).toEqual([])
+    })
+
+    it('NÃO aparece no mês do cadastro sem lançamento nem membership — cadastro é responsabilidade da Equipe, não desta lista', () => {
+      const bruno = person({ id: 'b', contract: 'freelancer', createdAt: `${PERIOD}-01T00:00:00.000Z` })
+      expect(peopleVisibleInPeriod([bruno], [], PERIOD)).toEqual([])
+    })
+
+    it('sem lançamento nem membership, não aparece em nenhum mês', () => {
+      const bruno = person({ id: 'b', contract: 'freelancer', createdAt: '2026-01-01T00:00:00.000Z' })
+      expect(peopleVisibleInPeriod([bruno], [], PERIOD)).toEqual([])
+      expect(peopleVisibleInPeriod([bruno], [], '2026-09')).toEqual([])
+    })
+
+    it('lançamento não pago também conta — não precisa estar quitado para aparecer', () => {
+      const bruno = person({ id: 'b', contract: 'freelancer' })
+      const naoPago = [{ ...entry('servico', 500, false), personId: 'b' }]
+      expect(peopleVisibleInPeriod([bruno], naoPago, PERIOD)).toEqual([bruno])
+    })
+  })
+
+  it('combina os dois tipos no mesmo mês, cada um pela sua regra', () => {
+    const ana = person({ id: 'ana', contract: 'fixo', createdAt: '2026-01-01T00:00:00.000Z' })
+    const bruno = person({ id: 'bruno', contract: 'freelancer' })
+    const lancamentos = [{ ...entry('servico', 500, false), personId: 'bruno' }]
+
+    const visiveis = peopleVisibleInPeriod([ana, bruno], lancamentos, PERIOD)
+    expect(visiveis.map((p) => p.id).sort()).toEqual(['ana', 'bruno'])
+  })
+
+  describe('memberships — "Adicionar ao mês"', () => {
+    it('readiciona freela/diarista a um mês em que não tem lançamento nem é o mês de cadastro', () => {
+      const helena = person({
+        id: 'h',
+        contract: 'diarista',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      })
+      const memberships = [{ personId: 'h', period: PERIOD }]
+
+      expect(peopleVisibleInPeriod([helena], [], PERIOD, memberships)).toEqual([helena])
+    })
+
+    it('membership só vale para o período exato', () => {
+      const helena = person({
+        id: 'h',
+        contract: 'diarista',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      })
+      const memberships = [{ personId: 'h', period: PERIOD }]
+
+      expect(peopleVisibleInPeriod([helena], [], '2026-09', memberships)).toEqual([])
+    })
+
+    it('sem o parâmetro `memberships`, comportamento continua igual ao de antes', () => {
+      // Regressão: os ~13 casos de teste anteriores chamam a função com só 3
+      // argumentos — o default precisa preservar o comportamento deles.
+      const helena = person({ id: 'h', contract: 'diarista', createdAt: '2026-01-01T00:00:00.000Z' })
+      expect(peopleVisibleInPeriod([helena], [], PERIOD)).toEqual([])
+    })
+
+    it('não afeta fixo — membership é ignorada para esse tipo de contrato', () => {
+      const ana = person({ id: 'ana', contract: 'fixo', createdAt: '2026-01-01T00:00:00.000Z' })
+      const memberships = [{ personId: 'ana', period: '2020-01' }]
+      // Fixo fora da janela cadastro→saída não aparece mesmo com membership.
+      expect(peopleVisibleInPeriod([ana], [], '2020-01', memberships)).toEqual([])
+    })
   })
 })

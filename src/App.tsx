@@ -1,20 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Sidebar } from './components/Sidebar'
-import { PersonRow } from './components/PersonRow'
+import { MonthNav, TopNav, type TabId } from './components/Shell'
 import { PersonSheet } from './components/PersonSheet'
+import { AddToMonthSheet } from './components/AddToMonthSheet'
 import { ValueSheet, type ValueResult } from './components/ValueSheet'
+import { SignSheet, type SignResult } from './components/SignSheet'
+import { ReceiptSheet } from './components/ReceiptSheet'
 import { Toast } from './components/Toast'
 import { DemoNotice } from './components/DemoNotice'
-import { ButterflyMark } from './components/Primitives'
+import { EquipePage } from './pages/EquipePage'
+import { PagamentosPage } from './pages/PagamentosPage'
+import { AgendaPage } from './pages/AgendaPage'
+import { RelatoriosPage } from './pages/RelatoriosPage'
+import { ConfiguracoesPage } from './pages/ConfiguracoesPage'
 import { exportDb, loadDb, parseImportedDb, saveDb, uid } from './lib/storage'
 import { centsToNumber } from './lib/money'
 import {
+  buildFixedSalaries,
   buildGroups,
   buildRepeatedEntries,
   currentPeriod,
   formatMoney,
   formatPeriod,
   monthStats,
+  pendingByMethod,
+  peopleVisibleInPeriod,
   shiftPeriod,
   sortSummaries,
   statusOf,
@@ -25,49 +34,44 @@ import {
 import {
   KIND_EFFECT,
   KIND_LABEL,
+  type Company,
   type ContractType,
   type Database,
   type Entry,
+  type PaymentMethod,
   type Person,
+  type Receipt,
+  type AgendaItem,
 } from './lib/types'
-
-const FILTROS: { id: FilterKey; label: string }[] = [
-  { id: 'todos', label: 'Todos' },
-  { id: 'atraso', label: 'Em atraso' },
-  { id: 'apagar', label: 'A pagar' },
-  { id: 'pagos', label: 'Pagos' },
-]
-
-/**
- * Filtro por forma de contratação. É uma dimensão separada do status: ela pode
- * ver "só os diaristas que estão em atraso", por exemplo. Fica escondido
- * enquanto houver só um tipo cadastrado — aí não teria o que filtrar.
- */
-const TIPOS: { id: ContractType | 'todos'; label: string }[] = [
-  { id: 'todos', label: 'Todo mundo' },
-  { id: 'fixo', label: 'Fixos' },
-  { id: 'diarista', label: 'Diaristas' },
-  { id: 'freelancer', label: 'Freelas' },
-]
-
-const ORDENS: { id: SortKey; label: string }[] = [
-  { id: 'vencimento', label: 'Vencimento' },
-  { id: 'valor', label: 'Maior valor' },
-  { id: 'nome', label: 'Nome' },
-]
+import { hashReceipt, lastHash, nextNumber } from './lib/receipt'
 
 type SheetState =
   | { mode: 'pagar' | 'lancar'; person: Person }
-  | { mode: 'pessoa'; person?: Person }
+  /** `entrarNoMes`: veio do atalho dentro de "Adicionar ao mês" — ao salvar,
+      a pessoa nova já ganha uma membership no período atual. */
+  | { mode: 'pessoa'; person?: Person; entrarNoMes?: boolean }
+  | { mode: 'membros' }
+  /** Assinatura logo após registrar o pagamento — `entryIds` amarra o recibo
+      aos lançamentos que ele quita. */
+  | {
+      mode: 'assinar'
+      person: Person
+      valor: number
+      method: PaymentMethod
+      entryIds: string[]
+    }
+  | { mode: 'recibo'; recibo: Receipt }
   | null
 
 export default function App() {
   const [db, setDb] = useState<Database>(() => loadDb())
+  const [tab, setTab] = useState<TabId>('pagamentos')
   const [period, setPeriod] = useState(currentPeriod)
   const [filtro, setFiltro] = useState<FilterKey>('todos')
   const [tipo, setTipo] = useState<ContractType | 'todos'>('todos')
   const [sort, setSort] = useState<SortKey>('vencimento')
   const [abertos, setAbertos] = useState<Record<string, boolean>>({})
+  const [selecionados, setSelecionados] = useState<string[]>([])
   const [sheet, setSheet] = useState<SheetState>(null)
   const [toast, setToast] = useState('')
   const [discreet, setDiscreet] = useState(false)
@@ -77,18 +81,63 @@ export default function App() {
     saveDb(db)
   }, [db])
 
-  const people = useMemo(() => db.people.filter((p) => p.active), [db.people])
+  // Todo mundo ativo agora — usado para o que não depende de qual mês está
+  // aberto (auto-lançamento, repetir mês anterior).
+  const peopleAtivos = useMemo(() => db.people.filter((p) => p.active), [db.people])
+
+  // Quem deve aparecer NESTE mês: fixo aparece enquanto esteve na empresa
+  // (mesmo sem lançamento ainda); freelancer/diarista só se teve lançamento,
+  // foi cadastrada neste mês, ou foi readicionada via "Adicionar ao mês". Ver
+  // `peopleVisibleInPeriod`.
+  const peopleDoMes = useMemo(
+    () => peopleVisibleInPeriod(db.people, db.entries, period, db.monthMemberships),
+    [db.people, db.entries, period, db.monthMemberships],
+  )
+
+  // Quem já está no banco mas NÃO aparece neste mês — candidatos pro sheet
+  // de "Adicionar ao mês".
+  const candidatosDoMes = useMemo(() => {
+    const visiveisIds = new Set(peopleDoMes.map((p) => p.id))
+    return peopleAtivos.filter((p) => !visiveisIds.has(p.id))
+  }, [peopleAtivos, peopleDoMes])
+
+  /**
+   * O valor combinado no cadastro entra sozinho: salário de quem é fixo ao
+   * abrir o mês, e a diária/valor de referência de quem foi trazido pelo
+   * "Adicionar ao mês". Ela não deveria ter que redigitar um número que já
+   * está no cadastro. Roda só para o mês corrente e os futuros: em mês passado
+   * sem lançamento, criar valor agora inventaria uma dívida que nunca existiu.
+   *
+   * A lista é montada DENTRO do setDb, a partir do estado mais recente. Fazer
+   * isso fora (lendo `db.entries` do render) duplicava os salários: o efeito
+   * rodava de novo com a lista antiga antes do estado novo chegar.
+   */
+  useEffect(() => {
+    if (period < currentPeriod()) return
+    setDb((d) => {
+      const novos = buildFixedSalaries(d.entries, period, d.people, uid, d.monthMemberships)
+      return novos.length === 0 ? d : { ...d, entries: [...d.entries, ...novos] }
+    })
+  }, [period, db.people, db.monthMemberships])
+
+  // Trocar de mês ou de filtro descarta a seleção: manter marcado alguém que
+  // sumiu da tela levaria a pagar sem querer.
+  useEffect(() => {
+    setSelecionados([])
+  }, [period, filtro, tipo])
 
   const summaries = useMemo(
-    () => sortSummaries(people.map((p) => summarizePerson(p, db.entries, period)), sort),
-    [people, db.entries, period, sort],
+    () => sortSummaries(peopleDoMes.map((p) => summarizePerson(p, db.entries, period)), sort),
+    [peopleDoMes, db.entries, period, sort],
   )
 
   const stats = useMemo(() => monthStats(summaries), [summaries])
 
-  // Os dois filtros se combinam e valem só para a LISTA. O resumo do mês lá em
-  // cima continua somando todo mundo de propósito: é a resposta de "quanto
-  // falta pagar no total" — se ele mudasse junto, ela perderia essa visão.
+  const porForma = useMemo(() => pendingByMethod(summaries), [summaries])
+
+  // Os dois filtros se combinam e valem só para a LISTA. Os indicadores do mês
+  // continuam somando todo mundo de propósito: é a resposta de "quanto falta
+  // pagar no total" — se mudassem junto, ela perderia essa visão.
   const visiveis = useMemo(
     () =>
       summaries
@@ -102,28 +151,20 @@ export default function App() {
   const mesVazio = summaries.every((s) => s.entries.length === 0)
   const repetiveis = useMemo(
     () =>
-      mesVazio && people.length > 0
-        ? buildRepeatedEntries(db.entries, shiftPeriod(period, -1), period, people, uid)
+      mesVazio && peopleAtivos.length > 0
+        ? buildRepeatedEntries(db.entries, shiftPeriod(period, -1), period, peopleAtivos, uid)
         : [],
-    [mesVazio, db.entries, period, people],
+    [mesVazio, db.entries, period, peopleAtivos],
   )
 
-  // Quantas pessoas há de cada tipo — alimenta a contagem nos chips e decide
-  // se vale mostrar o filtro (com um tipo só, não há o que separar).
   const contagemPorTipo = useMemo(() => {
     const acc = { fixo: 0, diarista: 0, freelancer: 0 } as Record<ContractType, number>
-    people.forEach((p) => {
+    peopleDoMes.forEach((p) => {
       acc[p.contract] += 1
     })
     return acc
-  }, [people])
+  }, [peopleDoMes])
 
-  const tiposPresentes = (Object.keys(contagemPorTipo) as ContractType[]).filter(
-    (t) => contagemPorTipo[t] > 0,
-  )
-  const mostrarFiltroTipo = tiposPresentes.length > 1
-
-  const progressoMes = stats.total > 0 ? Math.min(100, (stats.pago / stats.total) * 100) : 0
   const ehMesAtual = period === currentPeriod()
   const val = (v: number) => (discreet ? '••••' : formatMoney(v))
 
@@ -131,26 +172,79 @@ export default function App() {
     setToast(msg)
   }
 
-  function upsertPerson(person: Person) {
+  // -------------------------------------------------------------------------
+  // Pessoas e lançamentos
+  // -------------------------------------------------------------------------
+
+  /**
+   * `entrarNoMes` vem do atalho "Nova pessoa" dentro de "Adicionar ao mês":
+   * ela já nasce com uma membership no período atual, pra não precisar de um
+   * segundo passo — cadastrar e trazer pro mês na mesma ação.
+   */
+  function upsertPerson(person: Person, entrarNoMes = false) {
+    const editando = db.people.some((p) => p.id === person.id)
     setDb((d) => ({
       ...d,
-      people: d.people.some((p) => p.id === person.id)
+      people: editando
         ? d.people.map((p) => (p.id === person.id ? person : p))
         : [...d.people, person],
+      monthMemberships:
+        !editando && entrarNoMes
+          ? [...d.monthMemberships, { personId: person.id, period }]
+          : d.monthMemberships,
     }))
-    const editando = db.people.some((p) => p.id === person.id)
     setSheet(null)
     flash(editando ? 'Dados atualizados.' : `${person.name.split(' ')[0]} entrou na lista.`)
   }
 
+  function salvarEmpresa(company: Company) {
+    setDb((d) => ({ ...d, company }))
+    flash('Dados de quem paga salvos.')
+  }
+
   function archivePerson(id: string) {
     const alvo = db.people.find((p) => p.id === id)
+    // Guarda quando ela saiu: é o que faz um fixo continuar aparecendo nos
+    // meses em que trabalhou e sumir só dos meses seguintes à saída.
+    const hoje = new Date().toISOString()
     setDb((d) => ({
       ...d,
-      people: d.people.map((p) => (p.id === id ? { ...p, active: false } : p)),
+      people: d.people.map((p) =>
+        p.id === id ? { ...p, active: false, inactivatedAt: hoje } : p,
+      ),
     }))
     setSheet(null)
     if (alvo) flash(`${alvo.name.split(' ')[0]} saiu da lista.`)
+  }
+
+  function reactivatePerson(id: string) {
+    const alvo = db.people.find((p) => p.id === id)
+    setDb((d) => ({
+      ...d,
+      people: d.people.map((p) =>
+        p.id === id ? { ...p, active: true, inactivatedAt: undefined } : p,
+      ),
+    }))
+    setSheet(null)
+    if (alvo) flash(`${alvo.name.split(' ')[0]} voltou pra lista.`)
+  }
+
+  /** Marca quem foi escolhido no sheet "Adicionar ao mês" como participante. */
+  function addMonthMembers(personIds: string[]) {
+    if (personIds.length === 0) return
+    setDb((d) => ({
+      ...d,
+      monthMemberships: [
+        ...d.monthMemberships,
+        ...personIds.map((personId) => ({ personId, period })),
+      ],
+    }))
+    setSheet(null)
+    flash(
+      personIds.length === 1
+        ? 'Pessoa adicionada ao mês.'
+        : `${personIds.length} pessoas adicionadas ao mês.`,
+    )
   }
 
   function toggleEntry(entry: Entry) {
@@ -171,6 +265,15 @@ export default function App() {
     const valor = centsToNumber(r.cents)
     const quita = valor >= resumo.falta
 
+    // Quais lançamentos este pagamento cobre — o recibo precisa apontar para
+    // eles, senão fica solto e não dá para dizer depois a que ele se referia.
+    const alvos = quita
+      ? resumo.entries
+          .filter((e) => !e.paid && KIND_EFFECT[e.kind] !== 'abate')
+          .map((e) => e.id)
+      : []
+    const idVale = quita ? '' : uid()
+
     setDb((d) => {
       if (quita) {
         return {
@@ -180,13 +283,20 @@ export default function App() {
             e.period === period &&
             !e.paid &&
             KIND_EFFECT[e.kind] !== 'abate'
-              ? { ...e, paid: true, date: r.date, method: r.method, receiptName: r.receiptName || e.receiptName }
+              ? {
+                  ...e,
+                  paid: true,
+                  date: r.date,
+                  method: r.method,
+                  receiptName: r.receiptName || e.receiptName,
+                  receiptImage: r.receiptImage || e.receiptImage,
+                }
               : e,
           ),
         }
       }
       const vale: Entry = {
-        id: uid(),
+        id: idVale,
         personId: person.id,
         period,
         kind: 'vale',
@@ -196,16 +306,131 @@ export default function App() {
         description: r.obs.trim(),
         method: r.method,
         receiptName: r.receiptName || undefined,
+        receiptImage: r.receiptImage || undefined,
         createdAt: new Date().toISOString(),
       }
       return { ...d, entries: [...d.entries, vale] }
     })
+
+    if (r.colherAssinatura) {
+      setSheet({
+        mode: 'assinar',
+        person,
+        valor,
+        method: r.method,
+        entryIds: quita ? alvos : [idVale],
+      })
+      return
+    }
 
     setSheet(null)
     flash(
       quita
         ? `${person.name.split(' ')[0]} está quitada — ${formatMoney(valor)}`
         : `${formatMoney(valor)} registrado · falta ${formatMoney(resumo.falta - valor)}`,
+    )
+  }
+
+  /**
+   * Fecha o ciclo: monta o recibo assinado, encadeia no hash do anterior e
+   * abre a tela de envio. O CPF sobe para o cadastro quando é novo, para ela
+   * não redigitar no mês que vem.
+   */
+  async function assinarRecibo(
+    person: Person,
+    valor: number,
+    method: PaymentMethod,
+    entryIds: string[],
+    r: SignResult,
+  ) {
+    const numero = nextNumber(db.recibos)
+    const prevHash = lastHash(db.recibos)
+    const signedAt = new Date().toISOString()
+
+    const hash = await hashReceipt({
+      numero,
+      personName: person.name,
+      personDoc: r.doc,
+      payerName: db.company.name,
+      payerDoc: db.company.doc,
+      amount: valor,
+      method,
+      period,
+      signedAt,
+      signature: r.signature,
+      prevHash,
+    })
+
+    const recibo: Receipt = {
+      id: uid(),
+      numero,
+      personId: person.id,
+      period,
+      entryIds,
+      signature: r.signature,
+      personName: person.name,
+      personDoc: r.doc,
+      payerName: db.company.name,
+      payerDoc: db.company.doc,
+      payerDocType: db.company.docType,
+      amount: valor,
+      amountText: r.amountText,
+      method,
+      termo: r.termo,
+      signedAt,
+      hash,
+      prevHash,
+    }
+
+    setDb((d) => ({
+      ...d,
+      recibos: [...d.recibos, recibo],
+      people: r.guardarDoc
+        ? d.people.map((p) => (p.id === person.id ? { ...p, doc: r.doc } : p))
+        : d.people,
+    }))
+
+    setSheet({ mode: 'recibo', recibo })
+  }
+
+  function alternarSelecao(id: string) {
+    setSelecionados((atual) =>
+      atual.includes(id) ? atual.filter((x) => x !== id) : [...atual, id],
+    )
+  }
+
+  /**
+   * Quita de uma vez todo mundo que está marcado, cada um pela forma de
+   * pagamento do próprio cadastro — é por isso que o lote não precisa
+   * perguntar nada: a informação já está lá.
+   */
+  function pagarSelecionados() {
+    const alvos = summaries.filter((s) => selecionados.includes(s.person.id) && s.falta > 0)
+    if (alvos.length === 0) return
+
+    const ids = new Set(alvos.map((s) => s.person.id))
+    const hoje = new Date().toISOString().slice(0, 10)
+    const total = alvos.reduce((acc, s) => acc + s.falta, 0)
+
+    setDb((d) => ({
+      ...d,
+      entries: d.entries.map((e) =>
+        ids.has(e.personId) && e.period === period && !e.paid && KIND_EFFECT[e.kind] !== 'abate'
+          ? {
+              ...e,
+              paid: true,
+              date: hoje,
+              method: d.people.find((p) => p.id === e.personId)?.method ?? e.method,
+            }
+          : e,
+      ),
+    }))
+
+    setSelecionados([])
+    flash(
+      alvos.length === 1
+        ? `${alvos[0].person.name.split(' ')[0]} está quitada — ${formatMoney(total)}`
+        : `${alvos.length} pessoas quitadas — ${formatMoney(total)}`,
     )
   }
 
@@ -233,6 +458,30 @@ export default function App() {
     flash(`${repetiveis.length} lançamentos trazidos.`)
   }
 
+  // -------------------------------------------------------------------------
+  // Agenda
+  // -------------------------------------------------------------------------
+
+  function upsertAgendaItem(item: AgendaItem) {
+    const editando = db.agenda.some((it) => it.id === item.id)
+    setDb((d) => ({
+      ...d,
+      agenda: editando
+        ? d.agenda.map((it) => (it.id === item.id ? item : it))
+        : [...d.agenda, item],
+    }))
+    flash(editando ? 'Item atualizado.' : 'Item adicionado à agenda.')
+  }
+
+  function deleteAgendaItem(id: string) {
+    setDb((d) => ({ ...d, agenda: d.agenda.filter((it) => it.id !== id) }))
+    flash('Item excluído.')
+  }
+
+  // -------------------------------------------------------------------------
+  // Backup
+  // -------------------------------------------------------------------------
+
   function handleImport(file: File) {
     const reader = new FileReader()
     reader.onload = () => {
@@ -250,52 +499,29 @@ export default function App() {
   }
 
   const alvoSummary =
-    sheet && sheet.mode !== 'pessoa'
+    sheet && (sheet.mode === 'pagar' || sheet.mode === 'lancar')
       ? summaries.find((s) => s.person.id === sheet.person.id)
       : undefined
 
+  // A navegação de mês não serve na Agenda, que anda por semana.
+  const monthNav =
+    tab === 'agenda' || tab === 'config' ? null : (
+      <MonthNav
+        label={formatPeriod(period)}
+        onPrev={() => setPeriod(shiftPeriod(period, -1))}
+        onNext={() => setPeriod(shiftPeriod(period, 1))}
+        onToday={() => setPeriod(currentPeriod())}
+        showToday={!ehMesAtual}
+      />
+    )
+
   return (
-    <div className="flex min-h-screen items-stretch bg-cream text-[15px] text-ink">
-      <Sidebar onExport={() => exportDb(db)} />
-
-      <main className="flex min-w-0 flex-1 flex-col">
-        {/*
-          A barra atravessa a tela toda (fundo e borda), mas o conteúdo interno
-          usa a mesma coluna de 1040px do corpo — senão o "Nova pessoa" fica
-          jogado no canto, longe da lista, em telas largas.
-        */}
-        <header className="sticky top-0 z-20 border-b border-cream-deep bg-[rgba(250,248,244,0.88)] backdrop-blur-[10px]">
-          <div className="mx-auto flex w-full max-w-[1040px] items-center gap-3.5 px-5 py-3.5 sm:px-8">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPeriod(shiftPeriod(period, -1))}
-              aria-label="Mês anterior"
-              className="flex rounded-[9px] p-1.5 text-ink-faint transition-colors hover:bg-cream-deep hover:text-ink"
-            >
-              <Chevron dir="left" />
-            </button>
-            <h1 className="min-w-[130px] text-center font-display text-[23px] font-semibold tracking-[0.01em] sm:min-w-[172px]">
-              {formatPeriod(period)}
-            </h1>
-            <button
-              onClick={() => setPeriod(shiftPeriod(period, 1))}
-              aria-label="Próximo mês"
-              className="flex rounded-[9px] p-1.5 text-ink-faint transition-colors hover:bg-cream-deep hover:text-ink"
-            >
-              <Chevron dir="right" />
-            </button>
-          </div>
-
-          {!ehMesAtual ? (
-            <button
-              onClick={() => setPeriod(currentPeriod())}
-              className="hidden rounded-lg px-2.5 py-[5px] text-[12.5px] font-medium text-butterfly-500 transition-colors hover:bg-butterfly-50 sm:block"
-            >
-              voltar para hoje
-            </button>
-          ) : null}
-
-          <div className="ml-auto flex items-center gap-2.5">
+    <div className="flex min-h-screen flex-col text-[15px] text-ink">
+      <TopNav
+        tab={tab}
+        onTab={setTab}
+        right={
+          <>
             <input
               ref={fileRef}
               type="file"
@@ -311,236 +537,139 @@ export default function App() {
               onClick={() => setDiscreet(!discreet)}
               aria-pressed={discreet}
               title={discreet ? 'Mostrar valores' : 'Esconder valores'}
-              className={`flex rounded-[9px] p-2 transition-colors ${
-                discreet ? 'bg-cream-deep text-ink' : 'text-ink-faint hover:bg-cream-deep hover:text-ink'
+              className={`flex rounded-[10px] p-2 transition-colors ${
+                discreet
+                  ? 'bg-blush-100 text-blush-600'
+                  : 'text-ink-faint hover:bg-blush-100 hover:text-blush-600'
               }`}
             >
               <EyeIcon off={discreet} />
             </button>
+          </>
+        }
+      />
+
+      <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 pb-16 sm:px-7">
+        {tab === 'equipe' ? (
+          <EquipePage
+            people={db.people}
+            onNovaPessoa={() => setSheet({ mode: 'pessoa' })}
+            onEditar={(p) => setSheet({ mode: 'pessoa', person: p })}
+          />
+        ) : null}
+
+        {tab === 'pagamentos' ? (
+          <PagamentosPage
+            db={db}
+            period={period}
+            summaries={summaries}
+            grupos={grupos}
+            stats={stats}
+            filtro={filtro}
+            setFiltro={setFiltro}
+            tipo={tipo}
+            setTipo={setTipo}
+            sort={sort}
+            setSort={setSort}
+            contagemPorTipo={contagemPorTipo}
+            abertos={abertos}
+            setAbertos={setAbertos}
+            selecionados={selecionados}
+            onSelecionar={alternarSelecao}
+            onSelecionarTodos={setSelecionados}
+            onPagarSelecionados={pagarSelecionados}
+            porForma={porForma}
+            repetiveis={repetiveis}
+            onRepetir={repetirMesAnterior}
+            discreet={discreet}
+            val={val}
+            aside={monthNav}
+            onAdicionarAoMes={() => setSheet({ mode: 'membros' })}
+            onIrParaEquipe={() => setTab('equipe')}
+            onPagar={(p) => setSheet({ mode: 'pagar', person: p })}
+            onLancar={(p) => setSheet({ mode: 'lancar', person: p })}
+            onEditar={(p) => setSheet({ mode: 'pessoa', person: p })}
+            onToggleEntry={toggleEntry}
+            onVerRecibo={(recibo) => setSheet({ mode: 'recibo', recibo })}
+          />
+        ) : null}
+
+        {tab === 'agenda' ? (
+          <AgendaPage
+            agenda={db.agenda}
+            people={peopleAtivos}
+            onSave={upsertAgendaItem}
+            onDelete={deleteAgendaItem}
+            onError={flash}
+          />
+        ) : null}
+
+        {tab === 'relatorios' ? (
+          <RelatoriosPage
+            db={db}
+            period={period}
+            val={val}
+            aside={monthNav}
+            onVerRecibo={(recibo) => setSheet({ mode: 'recibo', recibo })}
+            onAviso={flash}
+          />
+        ) : null}
+
+        {tab === 'config' ? (
+          <ConfiguracoesPage company={db.company} onSave={salvarEmpresa} onError={flash} />
+        ) : null}
+      </main>
+
+      <footer className="border-t border-blush-100 bg-white/40">
+        <div className="mx-auto flex w-full max-w-[1280px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-5 sm:px-7">
+          <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-ink-dim">
+            STHE · Controle interno
+          </span>
+          {__DEMO__ ? (
+            <span className="rounded-full bg-blush-100 px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.1em] text-blush-600">
+              demonstração
+            </span>
+          ) : null}
+          <span className="ml-auto flex items-center gap-3 text-[12.5px] text-ink-faint">
+            Tudo salvo neste aparelho
             <button
-              onClick={() => setSheet({ mode: 'pessoa' })}
-              className="flex items-center gap-[7px] rounded-[11px] bg-ink px-[15px] py-[9px] text-[14px] font-medium text-cream transition-colors hover:bg-ink-hover"
+              onClick={() => exportDb(db)}
+              className="font-medium text-ink-soft underline-offset-4 transition-colors hover:text-blush-500 hover:underline"
             >
-              <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-                <path d="M8 3.5v9M3.5 8h9" />
-              </svg>
-              <span className="hidden sm:inline">Nova pessoa</span>
+              Baixar backup
             </button>
-            </div>
-          </div>
-        </header>
-
-        <div className="mx-auto w-full max-w-[1040px] px-5 pb-16 pt-[34px] sm:px-8">
-          <section className="flex flex-wrap items-end gap-x-10 gap-y-6 border-b border-cream-deep pb-[26px]">
-            <div className="min-w-[260px]">
-              <p className="mb-1.5 text-[12px] uppercase tracking-[0.1em] text-ink-faint">
-                Falta pagar
-              </p>
-              <p className="text-[44px] font-semibold leading-none tracking-[-0.025em] tabular-nums">
-                {val(stats.falta)}
-              </p>
-              <div className="mt-4 h-[5px] w-[300px] max-w-full overflow-hidden rounded-full bg-cream-deep">
-                <div
-                  className="h-full rounded-full bg-butterfly-500 transition-[width] duration-500"
-                  style={{ width: `${progressoMes}%` }}
-                />
-              </div>
-              <p className="mt-[9px] text-[13px] text-ink-faint">
-                {val(stats.pago)} já pago de {val(stats.total)}
-              </p>
-            </div>
-
-            <div className="flex gap-[34px] pb-1">
-              <div>
-                <p className="mb-1.5 flex items-center gap-1.5 text-[12px] uppercase tracking-[0.1em] text-late">
-                  <span className="h-1.5 w-1.5 rounded-full bg-late" aria-hidden />
-                  Em atraso
-                </p>
-                <p className="text-[21px] font-semibold leading-tight tracking-[-0.015em] tabular-nums text-late">
-                  {val(stats.atrasoTotal)}
-                </p>
-                <p className="mt-1 text-[13px] text-ink-faint">
-                  {stats.atrasoCount} {stats.atrasoCount === 1 ? 'pessoa' : 'pessoas'}
-                </p>
-              </div>
-              <div>
-                <p className="mb-1.5 text-[12px] uppercase tracking-[0.1em] text-ink-faint">
-                  Próximo
-                </p>
-                <p className="text-[21px] font-semibold leading-tight tracking-[-0.015em] tabular-nums">
-                  {stats.proximo ? val(stats.proximo.falta) : '—'}
-                </p>
-                <p className="mt-1 text-[13px] text-ink-faint">
-                  {stats.proximo
-                    ? `dia ${stats.proximo.person.payDay} · ${stats.proximo.person.name.split(' ')[0]}`
-                    : 'nada a vencer'}
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {repetiveis.length > 0 ? (
-            <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl border border-butterfly-100 bg-butterfly-50/60 px-5 py-4">
-              <p className="flex-1 text-[13.5px] leading-relaxed text-ink-soft">
-                Repetir os pagamentos de {formatPeriod(shiftPeriod(period, -1)).toLowerCase()}?{' '}
-                <span className="text-ink-dim">
-                  {repetiveis.length} lançamentos, como não pagos.
-                </span>
-              </p>
-              <button
-                onClick={repetirMesAnterior}
-                className="rounded-[10px] bg-ink px-3.5 py-2 text-[13.5px] font-medium text-cream transition-colors hover:bg-ink-hover"
-              >
-                Repetir
-              </button>
-            </div>
-          ) : null}
-
-          <div className="flex flex-wrap items-center gap-1.5 pb-2 pt-5">
-            {FILTROS.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFiltro(f.id)}
-                aria-pressed={filtro === f.id}
-                className={`rounded-[9px] px-[13px] py-[7px] text-[13.5px] font-medium transition-colors ${
-                  filtro === f.id ? 'bg-ink text-cream' : 'text-ink-faint hover:text-ink-soft'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-
-            <div className="ml-auto flex items-center gap-1">
-              <span className="hidden text-[12px] text-ink-dim sm:inline">ordenar por</span>
-              <select
-                value={sort}
-                onChange={(e) => setSort(e.target.value as SortKey)}
-                aria-label="Ordenar por"
-                className="cursor-pointer rounded-[9px] border-0 bg-transparent py-[7px] pl-1 pr-1 text-[13px] font-medium text-ink-soft outline-none transition-colors hover:text-ink"
-              >
-                {ORDENS.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {mostrarFiltroTipo ? (
-            <div className="flex flex-wrap items-center gap-1.5 pb-3.5">
-              {TIPOS.filter((t) => t.id === 'todos' || contagemPorTipo[t.id] > 0).map((t) => {
-                const ativo = tipo === t.id
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => setTipo(t.id)}
-                    aria-pressed={ativo}
-                    className={`rounded-full border px-3 py-[5px] text-[12.5px] font-medium transition-colors ${
-                      ativo
-                        ? 'border-butterfly-200 bg-butterfly-50 text-butterfly-600'
-                        : 'border-cream-deep bg-white text-ink-faint hover:text-ink-soft'
-                    }`}
-                  >
-                    {t.label}
-                    {t.id !== 'todos' ? (
-                      <span className={ativo ? 'text-butterfly-500' : 'text-ink-dim'}>
-                        {' '}
-                        {contagemPorTipo[t.id]}
-                      </span>
-                    ) : null}
-                  </button>
-                )
-              })}
-            </div>
-          ) : null}
-
-          {people.length === 0 || grupos.length === 0 ? (
-            <Vazio
-              titulo={
-                people.length === 0
-                  ? 'Comece adicionando quem trabalha com você'
-                  : 'Nada por aqui neste filtro'
-              }
-              texto={
-                people.length === 0
-                  ? 'Cadastre cada pessoa uma vez, com o valor e o dia de pagar. Depois é só lançar os pagamentos do mês e marcar o que já saiu.'
-                  : tipo !== 'todos' && filtro !== 'todos'
-                    ? 'Nenhuma pessoa desse tipo nesta situação. Troque um dos dois filtros.'
-                    : 'Troque o filtro para ver as outras pessoas.'
-              }
-              acao={
-                people.length === 0 ? (
-                  <button
-                    onClick={() => setSheet({ mode: 'pessoa' })}
-                    className="mt-2 rounded-[11px] bg-ink px-[15px] py-[9px] text-[14px] font-medium text-cream transition-colors hover:bg-ink-hover"
-                  >
-                    Adicionar primeira pessoa
-                  </button>
-                ) : null
-              }
-            />
-          ) : (
-            grupos.map((g) => (
-              <section key={g.key} className="mb-[30px]">
-                <div className="flex items-center gap-2 px-0.5 pb-2.5">
-                  <span
-                    className="h-1.5 w-1.5 rounded-full"
-                    style={{ background: g.cor }}
-                    aria-hidden
-                  />
-                  <h2 className="text-[12px] font-medium uppercase tracking-[0.1em] text-ink-soft">
-                    {g.titulo}
-                  </h2>
-                  <span className="text-[12px] text-ink-dim">{g.items.length}</span>
-                  <span className="h-px flex-1 bg-cream-deep" aria-hidden />
-                  <span className="text-[13px] tabular-nums text-ink-faint">{val(g.soma)}</span>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  {g.items.map((s) => (
-                    <PersonRow
-                      key={s.person.id}
-                      summary={s}
-                      period={period}
-                      discreet={discreet}
-                      open={!!abertos[s.person.id]}
-                      onToggle={() =>
-                        setAbertos((a) => ({ ...a, [s.person.id]: !a[s.person.id] }))
-                      }
-                      onPagar={() => setSheet({ mode: 'pagar', person: s.person })}
-                      onLancar={() => setSheet({ mode: 'lancar', person: s.person })}
-                      onEditar={() => setSheet({ mode: 'pessoa', person: s.person })}
-                      onToggleEntry={toggleEntry}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))
-          )}
-
-          <div className="flex justify-center pt-2 lg:hidden">
             <button
               onClick={() => fileRef.current?.click()}
-              className="text-[12.5px] text-ink-dim underline-offset-4 hover:underline"
+              className="text-ink-dim underline-offset-4 transition-colors hover:text-blush-500 hover:underline"
             >
-              Restaurar backup
+              Restaurar
             </button>
-          </div>
+          </span>
         </div>
-      </main>
+      </footer>
 
       {sheet?.mode === 'pessoa' ? (
         <PersonSheet
           initial={sheet.person}
-          onSave={upsertPerson}
+          onSave={(p) => upsertPerson(p, sheet.entrarNoMes)}
           onArchive={sheet.person ? () => archivePerson(sheet.person!.id) : undefined}
+          onReactivate={sheet.person ? () => reactivatePerson(sheet.person!.id) : undefined}
           onClose={() => setSheet(null)}
           onError={flash}
         />
       ) : null}
 
-      {sheet && sheet.mode !== 'pessoa' && alvoSummary ? (
+      {sheet?.mode === 'membros' ? (
+        <AddToMonthSheet
+          period={period}
+          candidatos={candidatosDoMes}
+          onConfirm={addMonthMembers}
+          onNovaPessoa={() => setSheet({ mode: 'pessoa', entrarNoMes: true })}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
+
+      {sheet && (sheet.mode === 'pagar' || sheet.mode === 'lancar') && alvoSummary ? (
         <ValueSheet
           mode={sheet.mode}
           person={sheet.person}
@@ -555,6 +684,42 @@ export default function App() {
         />
       ) : null}
 
+      {sheet?.mode === 'assinar' ? (
+        <SignSheet
+          person={sheet.person}
+          valor={sheet.valor}
+          method={sheet.method}
+          period={period}
+          company={db.company}
+          onIrParaConfig={() => {
+            setSheet(null)
+            setTab('config')
+            flash('Preencha os dados e registre o pagamento de novo.')
+          }}
+          onConfirm={(r) =>
+            void assinarRecibo(sheet.person, sheet.valor, sheet.method, sheet.entryIds, r)
+          }
+          // Fechar aqui não desfaz o pagamento — ele já foi registrado. Só fica
+          // sem recibo assinado, que é o que a mensagem explica.
+          onClose={() => {
+            setSheet(null)
+            flash('Pagamento registrado — sem assinatura.')
+          }}
+          onError={flash}
+        />
+      ) : null}
+
+      {sheet?.mode === 'recibo' ? (
+        <ReceiptSheet
+          recibo={sheet.recibo}
+          onClose={() => {
+            setSheet(null)
+            flash(`Recibo nº ${String(sheet.recibo.numero).padStart(4, '0')} assinado.`)
+          }}
+          onError={flash}
+        />
+      ) : null}
+
       <Toast message={toast} onDone={() => setToast('')} />
 
       {__DEMO__ ? <DemoNotice /> : null}
@@ -562,39 +727,20 @@ export default function App() {
   )
 }
 
-function Chevron({ dir }: { dir: 'left' | 'right' }) {
-  return (
-    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d={dir === 'left' ? 'M10 3L5 8l5 5' : 'M6 3l5 5-5 5'} />
-    </svg>
-  )
-}
-
 function EyeIcon({ off }: { off: boolean }) {
   return (
-    <svg viewBox="0 0 18 18" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
+    <svg
+      viewBox="0 0 18 18"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      aria-hidden
+    >
       <path d="M1.5 9S4.5 3.5 9 3.5 16.5 9 16.5 9 13.5 14.5 9 14.5 1.5 9 1.5 9Z" />
       <circle cx="9" cy="9" r="2.5" />
       {off ? <path d="M3 15L15 3" /> : null}
     </svg>
-  )
-}
-
-function Vazio({
-  titulo,
-  texto,
-  acao,
-}: {
-  titulo: string
-  texto: string
-  acao?: React.ReactNode
-}) {
-  return (
-    <div className="flex flex-col items-center gap-2 px-5 py-[70px] text-center">
-      <ButterflyMark className="h-[34px] w-[34px] opacity-25" />
-      <h3 className="mt-1 font-display text-[19px] font-semibold">{titulo}</h3>
-      <p className="max-w-[320px] text-[13.5px] leading-relaxed text-ink-faint">{texto}</p>
-      {acao}
-    </div>
   )
 }

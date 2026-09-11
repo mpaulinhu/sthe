@@ -1,5 +1,5 @@
 import { formatMoney, formatShortDate, monthAbbr, type PersonSummary } from '../lib/calc'
-import { CONTRACT_LABEL, KIND_EFFECT, KIND_LABEL, type Entry } from '../lib/types'
+import { CONTRACT_LABEL, KIND_EFFECT, KIND_LABEL, type Entry, type Receipt } from '../lib/types'
 
 function initials(name: string): string {
   return name
@@ -10,26 +10,46 @@ function initials(name: string): string {
     .join('')
 }
 
+/** Cor do anel do avatar conforme a situação — dá leitura de status à distância. */
+const AVATAR_RING = {
+  pago: 'bg-paid-soft text-paid ring-paid/15',
+  atraso: 'bg-late-soft text-late ring-late/15',
+  neutro: 'bg-blush-50 text-blush-600 ring-blush-200/50',
+} as const
+
 export function PersonRow({
   summary,
   period,
   open,
   discreet,
+  index = 0,
+  selecionada,
+  recibos = [],
+  onSelecionar,
   onToggle,
   onPagar,
   onLancar,
   onEditar,
   onToggleEntry,
+  onVerRecibo,
 }: {
   summary: PersonSummary
   period: string
   open: boolean
   discreet: boolean
+  /** Posição na lista — só para escalonar a animação de entrada. */
+  index?: number
+  /** `undefined` quando a linha não é selecionável (nada a pagar). */
+  selecionada?: boolean
+  /** Recibos assinados desta pessoa neste mês. */
+  recibos?: Receipt[]
+  onSelecionar?: () => void
   onToggle: () => void
   onPagar: () => void
   onLancar: () => void
   onEditar: () => void
   onToggleEntry: (entry: Entry) => void
+  onVerRecibo?: (r: Receipt) => void
 }) {
   const { person, entries, total, pago, falta, quitado, atrasado, venceu } = summary
 
@@ -64,59 +84,120 @@ export function PersonRow({
   const parcial = falta > 0 && pago > 0
   const progresso = total > 0 ? Math.min(100, (pago / total) * 100) : 0
 
+  const tomAvatar = quitado ? AVATAR_RING.pago : atrasado || esquecido ? AVATAR_RING.atraso : AVATAR_RING.neutro
+
+  // Quais lançamentos já têm assinatura de recebimento — vira selo na linha.
+  const assinados = new Set(recibos.flatMap((r) => r.entryIds))
+
+  // Fio de status na borda esquerda: leitura periférica, sem pesar o card.
+  const fio = quitado
+    ? 'before:bg-paid'
+    : atrasado || esquecido
+      ? 'before:bg-late'
+      : falta > 0
+        ? 'before:bg-due'
+        : 'before:bg-transparent'
+
   return (
-    <article className="rounded-2xl border border-cream-deep bg-white shadow-[0_1px_2px_rgba(26,29,33,0.03)]">
-      <div className="flex flex-wrap items-center gap-x-3.5 gap-y-3 px-[18px] py-[15px] sm:flex-nowrap">
-        <div className="w-[34px] shrink-0 text-center">
+    <article
+      className={`rise-in group relative overflow-hidden rounded-[18px] border bg-white shadow-petal transition-all duration-300 hover:-translate-y-px hover:shadow-lift
+        before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:rounded-r-full before:transition-colors ${fio} ${
+          selecionada
+            ? 'border-butterfly-300 ring-1 ring-butterfly-200'
+            : open
+              ? 'border-blush-200 shadow-lift'
+              : 'border-blush-100 hover:border-blush-200'
+        }`}
+      style={{ ['--i' as string]: index }}
+    >
+      <div className="flex flex-wrap items-center gap-x-3.5 gap-y-3 px-[18px] py-4 sm:flex-nowrap">
+        {onSelecionar ? (
+          <button
+            onClick={onSelecionar}
+            role="checkbox"
+            aria-checked={!!selecionada}
+            aria-label={`Selecionar ${person.name} para pagar`}
+            className={`flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-md border transition-all ${
+              selecionada
+                ? 'border-butterfly-500 bg-butterfly-500 text-white'
+                : 'border-line bg-white hover:border-butterfly-300'
+            }`}
+          >
+            <svg
+              viewBox="0 0 14 14"
+              className="h-2.5 w-2.5"
+              style={{ opacity: selecionada ? 1 : 0 }}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M2.5 7.5l3 3 6-6.5" />
+            </svg>
+          </button>
+        ) : null}
+
+        <div className="w-[36px] shrink-0 text-center">
           <p
-            className={`text-[16px] font-semibold leading-none tabular-nums ${
-              atrasado || esquecido ? 'text-late' : 'text-ink-faint'
+            className={`font-display text-[17px] font-semibold leading-none tabular-nums ${
+              atrasado || esquecido ? 'text-late' : 'text-ink-soft'
             }`}
           >
             {String(person.payDay).padStart(2, '0')}
           </p>
-          <p className="mt-0.5 text-[10px] uppercase tracking-[0.06em] text-ink-dim">
+          <p className="mt-1 text-[9.5px] font-medium uppercase tracking-[0.1em] text-ink-dim">
             {monthAbbr(period)}
           </p>
         </div>
 
         <span
-          className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full text-[12.5px] font-semibold ${
-            quitado ? 'bg-paid-soft text-paid' : 'bg-cream-deep text-ink-soft'
-          }`}
+          className={`flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full text-[13px] font-semibold ring-4 transition-transform duration-300 group-hover:scale-105 ${tomAvatar}`}
           aria-hidden
         >
           {initials(person.name)}
         </span>
 
         <div className="min-w-0 flex-1 basis-[45%] sm:basis-auto">
-          <h3 className="font-display text-[18.5px] font-semibold leading-tight tracking-[0.005em]">
-            {person.name}
-          </h3>
-          <p className="mt-0.5 truncate text-[13px] text-ink-faint">
+          <h3 className="font-display text-[19px] font-semibold leading-tight">{person.name}</h3>
+          <p className="mt-0.5 truncate text-[12.5px] text-ink-faint">
             {person.role ? `${person.role} · ` : ''}
             {CONTRACT_LABEL[person.contract]}
+            {/* A forma aparece só enquanto há o que pagar: depois de quitado
+                ela vira ruído, e o detalhe já mostra como cada parte saiu. */}
+            {person.method && falta > 0 ? (
+              <span className="text-blush-500"> · {person.method}</span>
+            ) : null}
           </p>
         </div>
 
-        <div className="shrink-0 text-right sm:min-w-[118px]">
-          <p
-            className={`text-[18px] font-semibold leading-tight tracking-[-0.015em] tabular-nums ${
-              quitado ? 'text-paid' : 'text-ink'
-            }`}
-          >
-            {semLancamento ? '—' : val(quitado ? total : falta)}
-          </p>
-          <p className={`mt-[3px] text-[11px] uppercase tracking-[0.07em] ${statusColor}`}>
-            {status}
-          </p>
-        </div>
+        {/* No mobile o valor e as ações dividem a segunda linha inteira (valor
+            à esquerda, botão à direita); no desktop voltam a ser duas colunas
+            à direita do nome. */}
+        <div className="flex flex-1 basis-full items-center justify-between gap-3 sm:flex-none sm:basis-auto sm:justify-end">
+          <div className="text-left sm:min-w-[118px] sm:text-right">
+            <p
+              className={`font-display text-[19px] font-semibold leading-tight tracking-[-0.02em] tabular-nums ${
+                quitado ? 'text-paid' : 'text-ink'
+              }`}
+            >
+              {semLancamento ? '—' : val(quitado ? total : falta)}
+            </p>
+            <p
+              className={`mt-1 text-[10.5px] font-medium uppercase tracking-[0.09em] ${statusColor}`}
+            >
+              {status}
+            </p>
+          </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-1.5">
+          {/* "Pagar" é discreto em repouso e sólido no hover: sete botões
+              sólidos ao mesmo tempo virariam a mancha dominante da tela. */}
           {falta > 0 ? (
             <button
               onClick={onPagar}
-              className="rounded-[10px] border border-butterfly-100 bg-butterfly-50 px-3.5 py-2 text-[13.5px] font-medium text-butterfly-500 transition-colors hover:bg-butterfly-100"
+              className="rounded-[11px] border border-butterfly-100 bg-butterfly-50 px-4 py-2 text-[13px] font-medium text-butterfly-600 transition-all duration-200 hover:border-butterfly-500 hover:bg-butterfly-500 hover:text-white hover:shadow-[0_6px_14px_-6px_rgba(44,111,181,0.7)]"
             >
               Pagar
             </button>
@@ -125,7 +206,7 @@ export function PersonRow({
             // deixar isso a um clique evita ter que abrir os detalhes.
             <button
               onClick={onLancar}
-              className="rounded-[10px] border border-cream-deep bg-white px-3.5 py-2 text-[13.5px] font-medium text-ink-soft transition-colors hover:bg-cream"
+              className="rounded-[11px] border border-blush-200 bg-white px-3.5 py-2 text-[13px] font-medium text-blush-600 transition-colors hover:bg-blush-50"
             >
               Lançar
             </button>
@@ -134,11 +215,11 @@ export function PersonRow({
             onClick={onToggle}
             aria-label="Detalhes"
             aria-expanded={open}
-            className="flex rounded-[9px] p-2 text-ink-dim transition-colors hover:bg-cream-deep hover:text-ink-soft"
+            className="flex rounded-[10px] p-2 text-ink-dim transition-colors hover:bg-blush-50 hover:text-blush-500"
           >
             <svg
               viewBox="0 0 16 16"
-              className="h-[15px] w-[15px] transition-transform duration-200"
+              className="h-[15px] w-[15px] transition-transform duration-300"
               style={{ transform: open ? 'rotate(180deg)' : undefined }}
               fill="none"
               stroke="currentColor"
@@ -150,25 +231,29 @@ export function PersonRow({
               <path d="M3.5 6L8 10.5 12.5 6" />
             </svg>
           </button>
+          </div>
         </div>
       </div>
 
+      {/* Alinhada ao nome (não à borda do card): a barra pertence à pessoa,
+          e começar junto do texto deixa isso óbvio. O recuo acompanha a soma
+          das colunas do dia (36px) e do avatar (40px) mais os dois gaps. */}
       {parcial ? (
-        <div className="px-[18px] pb-[15px]">
-          <div className="h-1 overflow-hidden rounded-full bg-cream-deep">
+        <div className="-mt-1 px-[18px] pb-4 sm:pl-[116px]">
+          <div className="h-[5px] w-full max-w-[340px] overflow-hidden rounded-full bg-cream-deep">
             <div
-              className="h-full rounded-full bg-butterfly-500 transition-[width] duration-500"
+              className="h-full rounded-full bg-gradient-to-r from-butterfly-400 to-butterfly-600 transition-[width] duration-700 ease-out"
               style={{ width: `${progresso}%` }}
             />
           </div>
-          <p className="mt-[7px] text-[12px] text-ink-faint">
-            já pago {val(pago)} de {val(total)}
+          <p className="mt-2 text-[11.5px] text-ink-faint">
+            já pago <span className="font-medium text-ink-soft">{val(pago)}</span> de {val(total)}
           </p>
         </div>
       ) : null}
 
       {open ? (
-        <div className="rounded-b-[15px] border-t border-hair bg-surface-sunken">
+        <div className="rounded-b-[17px] border-t border-hair bg-gradient-to-b from-blush-50/50 to-transparent [animation:fadeIn_.22s_ease]">
           <div className="flex flex-col">
             {entries.map((e) => {
               const efeito = KIND_EFFECT[e.kind]
@@ -212,9 +297,26 @@ export function PersonRow({
                       {KIND_LABEL[e.kind]}
                       {e.description ? ` · ${desc(e.description)}` : ''}
                     </p>
-                    <p className="mt-0.5 text-[11.5px] text-ink-dim">
-                      {sub}
-                      {e.receiptName ? ' · com comprovante' : ''}
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-ink-dim">
+                      <span>{sub}</span>
+                      {e.receiptImage ? <span>· comprovante anexado</span> : null}
+                      {assinados.has(e.id) ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-paid-soft px-1.5 py-px font-medium text-paid">
+                          <svg
+                            viewBox="0 0 12 12"
+                            className="h-2.5 w-2.5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden
+                          >
+                            <path d="M2 6.3l2.6 2.6L10 3.2" />
+                          </svg>
+                          assinado
+                        </span>
+                      ) : null}
                     </p>
                   </div>
 
@@ -230,6 +332,50 @@ export function PersonRow({
               )
             })}
           </div>
+
+          {/* Recibos assinados do mês: é onde ela reabre para reenviar, e a
+              prova de que aquele pagamento foi reconhecido por quem recebeu. */}
+          {recibos.length > 0 ? (
+            <div className="flex flex-col gap-1.5 border-b border-hair px-[18px] py-3">
+              {recibos.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => onVerRecibo?.(r)}
+                  className="flex items-center gap-2.5 rounded-[10px] px-1.5 py-1.5 text-left transition-colors hover:bg-white"
+                >
+                  <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-paid-soft text-paid">
+                    <svg
+                      viewBox="0 0 14 14"
+                      className="h-3 w-3"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M3.5 2h7v10l-3.5-2-3.5 2V2Z" />
+                    </svg>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-medium leading-tight">
+                      Recibo nº {String(r.numero).padStart(4, '0')} · {val(r.amount)}
+                    </span>
+                    <span className="mt-0.5 block text-[11.5px] text-ink-dim">
+                      assinado em{' '}
+                      {new Date(r.signedAt).toLocaleString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-[12px] text-ink-faint">ver</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           <div className="flex items-center gap-1 px-3.5 py-2.5">
             <button

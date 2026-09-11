@@ -2,8 +2,15 @@ import { useState } from 'react'
 import { Sheet, Label, Segmented, fieldClass } from './Sheet'
 import { MoneyInput } from './MoneyInput'
 import { centsToNumber, numberToCents } from '../lib/money'
-import { CONTRACT_SHORT, type ContractType, type Person } from '../lib/types'
+import {
+  CONTRACT_SHORT,
+  PAYMENT_METHODS,
+  type ContractType,
+  type PaymentMethod,
+  type Person,
+} from '../lib/types'
 import { uid } from '../lib/storage'
+import { isValidCpf, maskCpf, onlyDigits } from '../lib/receipt'
 
 const CONTRACTS: { id: ContractType; label: string }[] = [
   { id: 'fixo', label: CONTRACT_SHORT.fixo },
@@ -28,12 +35,15 @@ export function PersonSheet({
   initial,
   onSave,
   onArchive,
+  onReactivate,
   onClose,
   onError,
 }: {
   initial?: Person
   onSave: (person: Person) => void
   onArchive?: () => void
+  /** Presente só quando `initial.active` é false — volta a pessoa pro banco ativo. */
+  onReactivate?: () => void
   onClose: () => void
   onError: (msg: string) => void
 }) {
@@ -42,11 +52,23 @@ export function PersonSheet({
   const [contract, setContract] = useState<ContractType>(initial?.contract ?? 'fixo')
   const [cents, setCents] = useState(numberToCents(initial?.baseAmount ?? 0))
   const [payDay, setPayDay] = useState(initial ? String(initial.payDay) : '')
+  const [method, setMethod] = useState<PaymentMethod>(initial?.method ?? 'Pix')
+  const [doc, setDoc] = useState(initial?.doc ? maskCpf(initial.doc) : '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
+
+  const docLimpo = onlyDigits(doc)
+  const docErrado = docLimpo.length === 11 && !isValidCpf(docLimpo)
 
   function confirm() {
     if (!name.trim()) {
       onError('Falta o nome.')
+      return
+    }
+    // CPF é opcional aqui (dá para preencher na hora de assinar), mas se foi
+    // digitado tem que estar certo — guardar um número inválido no cadastro
+    // significaria emitir recibos com identificação errada.
+    if (docLimpo && !isValidCpf(docLimpo)) {
+      onError('Confira o CPF — os dígitos não batem.')
       return
     }
     const dia = Math.min(31, Math.max(1, Number(payDay) || 5))
@@ -57,6 +79,8 @@ export function PersonSheet({
       contract,
       baseAmount: centsToNumber(cents),
       payDay: dia,
+      method,
+      doc: docLimpo || undefined,
       active: initial?.active ?? true,
       notes: notes.trim(),
       createdAt: initial?.createdAt ?? new Date().toISOString(),
@@ -107,7 +131,7 @@ export function PersonSheet({
       </label>
 
       <div className="flex flex-col gap-2">
-        <Label>Como ela recebe</Label>
+        <Label>Tipo de contrato</Label>
         <Segmented options={CONTRACTS} value={contract} onChange={setContract} />
       </div>
 
@@ -124,10 +148,42 @@ export function PersonSheet({
             onChange={(e) => setPayDay(e.target.value.replace(/\D/g, '').slice(0, 2))}
             inputMode="numeric"
             placeholder="05"
+            aria-label="Dia de pagar"
             className={`${fieldClass} text-[15px] tabular-nums`}
           />
         </label>
       </div>
+
+      {/* A forma habitual vira o padrão ao pagar e alimenta o resumo de
+          "quanto separar em dinheiro" na lista. */}
+      <div className="flex flex-col gap-2">
+        <Label>Como ela recebe</Label>
+        <Segmented
+          size="sm"
+          value={method}
+          onChange={setMethod}
+          options={PAYMENT_METHODS.map((m) => ({ id: m, label: m }))}
+        />
+      </div>
+
+      {/* Guardado aqui para não ser pedido toda vez que ela assinar um recibo.
+          É o que identifica quem recebeu, e sem ele o recibo perde força. */}
+      <label className="flex flex-col gap-[7px]">
+        <Label optional>CPF</Label>
+        <input
+          value={doc}
+          onChange={(e) => setDoc(maskCpf(e.target.value))}
+          inputMode="numeric"
+          placeholder="000.000.000-00"
+          aria-invalid={docErrado}
+          className={`${fieldClass} tabular-nums ${docErrado ? 'border-late' : ''}`}
+        />
+        <span className={`text-[12px] leading-snug ${docErrado ? 'text-late' : 'text-ink-dim'}`}>
+          {docErrado
+            ? 'Esse CPF não é válido — confira os números.'
+            : 'Usado nos recibos assinados. Dá para preencher depois, na hora de assinar.'}
+        </span>
+      </label>
 
       <label className="flex flex-col gap-[7px]">
         <Label optional>Observação</Label>
@@ -140,7 +196,7 @@ export function PersonSheet({
         />
       </label>
 
-      {initial && onArchive ? (
+      {initial && onArchive && initial.active ? (
         <button
           type="button"
           onClick={() => {
@@ -151,6 +207,16 @@ export function PersonSheet({
           className="self-center text-[13px] text-ink-dim underline-offset-4 transition-colors hover:text-late hover:underline"
         >
           Não trabalha mais aqui
+        </button>
+      ) : null}
+
+      {initial && onReactivate && !initial.active ? (
+        <button
+          type="button"
+          onClick={onReactivate}
+          className="self-center text-[13px] font-medium text-butterfly-600 underline-offset-4 transition-colors hover:underline"
+        >
+          Voltou a trabalhar aqui
         </button>
       ) : null}
     </Sheet>

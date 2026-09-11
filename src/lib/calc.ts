@@ -1,4 +1,10 @@
-import { KIND_EFFECT, type Entry, type Person } from './types'
+import {
+  KIND_EFFECT,
+  defaultKindFor,
+  type Entry,
+  type MonthMembership,
+  type Person,
+} from './types'
 
 export interface PersonSummary {
   person: Person
@@ -59,6 +65,53 @@ export function formatDate(iso: string): string {
 function todayIso(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * Quem deve aparecer na lista de um mês — a regra muda por tipo de contrato:
+ *
+ *  - Fixo: aparece em todo mês entre o cadastro e (se ela saiu) a saída. É
+ *    recorrente por natureza, então "existir naquele mês" já basta, mesmo
+ *    sem lançamento ainda.
+ *  - Diarista/freelancer: nunca aparece só por estar cadastrada — cadastro é
+ *    responsabilidade da aba Equipe, não desta lista. Aparece no mês em que
+ *    teve lançamento de verdade, ou num mês em que foi manualmente
+ *    adicionada via `memberships` (botão "Adicionar ao mês"), que é o único
+ *    caminho para trazer alguém pra cá, seja pela primeira vez ou de volta.
+ *
+ * `active: false` sem `inactivatedAt` (cadastros antigos, de antes desse
+ * campo existir) trata como "sempre esteve fora" para não ressuscitar
+ * alguém que ela já tinha tirado da lista de propósito.
+ */
+export function peopleVisibleInPeriod(
+  people: Person[],
+  entries: Entry[],
+  period: string,
+  memberships: MonthMembership[] = [],
+): Person[] {
+  const comLancamento = new Set(
+    entries.filter((e) => e.period === period).map((e) => e.personId),
+  )
+  const comMembership = new Set(
+    memberships.filter((m) => m.period === period).map((m) => m.personId),
+  )
+
+  return people.filter((p) => {
+    if (p.contract !== 'fixo') {
+      return comLancamento.has(p.id) || comMembership.has(p.id)
+    }
+
+    const desde = p.createdAt.slice(0, 7)
+    if (period < desde) return false
+
+    if (!p.active) {
+      if (!p.inactivatedAt) return false
+      const ate = p.inactivatedAt.slice(0, 7)
+      return period <= ate
+    }
+
+    return true
+  })
 }
 
 export function summarizePerson(person: Person, allEntries: Entry[], period: string): PersonSummary {
@@ -232,12 +285,97 @@ export function buildRepeatedEntries(
     }))
 }
 
+/**
+ * Lançamentos que o cadastro já permite adiantar, para o mês pedido. Quem tem
+ * valor combinado não deveria precisar redigitar o mesmo número — o app cria
+ * sozinho, como "ainda não pago", e ela só mexe quando o mês foge do padrão.
+ *
+ * Duas portas de entrada, com gatilhos diferentes:
+ *
+ *  - **Fixo**: entra em todo mês, pelo simples fato de estar na empresa. É a
+ *    natureza do salário mensal.
+ *  - **Freela/diarista**: entra só no mês em que foi trazido pelo "Adicionar
+ *    ao mês" (`memberships`). Adicionar alguém a um mês É o gesto de dizer
+ *    "vou pagar essa pessoa aqui" — deixar a linha em "sem lançamento" depois
+ *    disso obriga a redigitar um valor que já está no cadastro.
+ *
+ * Em ambos os casos, só entra quem tem valor base e ainda não tem NENHUM
+ * lançamento no mês: se ela já lançou qualquer coisa, respeitamos o que ela
+ * fez em vez de acrescentar por cima.
+ */
+export function buildFixedSalaries(
+  entries: Entry[],
+  period: string,
+  people: Person[],
+  makeId: () => string,
+  memberships: MonthMembership[] = [],
+): Entry[] {
+  const jaTem = new Set(entries.filter((e) => e.period === period).map((e) => e.personId))
+  const noMes = new Set(
+    memberships.filter((m) => m.period === period).map((m) => m.personId),
+  )
+
+  return people
+    .filter((p) => {
+      if (!p.active || p.baseAmount <= 0 || jaTem.has(p.id)) return false
+      return p.contract === 'fixo' || noMes.has(p.id)
+    })
+    .map((p) => ({
+      id: makeId(),
+      personId: p.id,
+      period,
+      // Cada tipo de contrato lança sob o próprio nome — "salário" para um
+      // freelancer sairia errado no recibo e no relatório por função.
+      kind: defaultKindFor(p.contract),
+      amount: p.baseAmount,
+      date: dayInPeriod(period, p.payDay),
+      paid: false,
+      description: '',
+      createdAt: new Date().toISOString(),
+    }))
+}
+
+/** O dia `day` dentro do período, respeitando meses mais curtos (31 → 28/30). */
+function dayInPeriod(period: string, day: number): string {
+  const [y, m] = period.split('-').map(Number)
+  const ultimoDia = new Date(y, m, 0).getDate()
+  return `${period}-${String(Math.min(Math.max(1, day), ultimoDia)).padStart(2, '0')}`
+}
+
 /** Mantém o dia, troca o mês/ano — respeitando meses mais curtos (31 → 28/30). */
 function moveDateToPeriod(iso: string, period: string): string {
   const [y, m] = period.split('-').map(Number)
   const dia = Number(iso?.split('-')[2]) || 1
   const ultimoDia = new Date(y, m, 0).getDate()
   return `${period}-${String(Math.min(dia, ultimoDia)).padStart(2, '0')}`
+}
+
+export interface MethodSlice {
+  /** 'Pix', 'Dinheiro'… ou 'Sem forma' para quem não definiu no cadastro. */
+  method: string
+  total: number
+  pessoas: number
+}
+
+/**
+ * Quanto ainda falta pagar, separado pela forma de pagamento de cada pessoa.
+ * Responde "quanto de dinheiro vivo eu preciso separar hoje" — a pergunta que
+ * ela hoje só consegue responder somando de cabeça.
+ */
+export function pendingByMethod(summaries: PersonSummary[]): MethodSlice[] {
+  const porForma = new Map<string, { total: number; pessoas: number }>()
+
+  summaries
+    .filter((s) => s.falta > 0)
+    .forEach((s) => {
+      const forma = s.person.method ?? 'Sem forma'
+      const atual = porForma.get(forma) ?? { total: 0, pessoas: 0 }
+      porForma.set(forma, { total: atual.total + s.falta, pessoas: atual.pessoas + 1 })
+    })
+
+  return [...porForma.entries()]
+    .map(([method, v]) => ({ method, ...v }))
+    .sort((a, b) => b.total - a.total)
 }
 
 export function summarizeMonth(summaries: PersonSummary[]): MonthSummary {
