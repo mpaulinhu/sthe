@@ -79,6 +79,9 @@ export function SignaturePad({
     if (!desenhando.current) return
     desenhando.current = false
     ultimo.current = null
+    // Só aqui, ao soltar o dedo: marcar durante o traço re-renderizaria e
+    // trocaria os ouvintes no meio do gesto (ver nota 3 abaixo).
+    setTemTraco(true)
     const canvas = canvasRef.current
     if (canvas) onChange(canvas.toDataURL('image/png'))
   }, [onChange])
@@ -86,16 +89,25 @@ export function SignaturePad({
   /**
    * O traço.
    *
-   * Ouvintes nativos em vez dos `onPointer*` do React por causa de uma
-   * exigência do toque: `preventDefault` num ouvinte de toque só tem efeito se
-   * ele foi registrado com `passive: false`, e o React registra os dele como
-   * passivos. Sem isso o navegador do celular trata o gesto como rolagem, o
-   * traço nunca começa, e a pessoa fica riscando o dedo numa tela que não
-   * responde.
+   * Três detalhes aqui são o que fazem a assinatura funcionar no celular.
+   * Todos custaram uma tentativa frustrada num aparelho real antes de virarem
+   * código.
    *
-   * O `pointermove`/`pointerup` ficam na janela, não no canvas: numa
-   * assinatura rápida o dedo sai do quadro o tempo todo, e com o ouvinte preso
-   * ao elemento a linha morreria na borda.
+   * 1. Ouvintes nativos, não `onPointer*` do React: `preventDefault` num
+   *    ouvinte de toque só vale se ele foi registrado com `passive: false`, e
+   *    o React registra os dele como passivos. Sem isso o navegador entende o
+   *    gesto como rolagem e o traço nunca começa.
+   *
+   * 2. `setPointerCapture` no início: o quadro vive dentro de um painel que
+   *    rola, e no Android o navegador dispara `pointercancel` assim que
+   *    decide que o gesto é rolagem — matando a assinatura no meio. Com o
+   *    ponteiro capturado, os eventos continuam vindo para o canvas e o
+   *    navegador para de disputar o gesto.
+   *
+   * 3. O efeito não depende de nada que mude durante o traço. Antes ele
+   *    chamava `setTemTraco` no `pointerdown`, o que re-renderizava, trocava
+   *    os ouvintes no meio do gesto e perdia o resto da assinatura. Agora o
+   *    estado só muda ao soltar o dedo.
    */
   useEffect(() => {
     const canvas = canvasRef.current
@@ -106,14 +118,32 @@ export function SignaturePad({
       return { x: e.clientX - rect.left, y: e.clientY - rect.top }
     }
 
+    const contexto = () => {
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return null
+      // O contexto zera quando o canvas é redimensionado; reafirmar aqui custa
+      // nada e evita um traço fino e preto-puro depois de girar o aparelho.
+      ctx.lineWidth = 2.2
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.strokeStyle = '#1a1d21'
+      return ctx
+    }
+
     function comecar(e: PointerEvent) {
       e.preventDefault()
+      try {
+        canvas!.setPointerCapture(e.pointerId)
+      } catch {
+        // Alguns navegadores recusam a captura; o traço ainda funciona sem
+        // ela, só fica sujeito ao cancelamento por rolagem.
+      }
       desenhando.current = true
       ultimo.current = posicao(e)
 
-      // Um toque seco (sem arrastar) também deve marcar: um ponto é assinatura
-      // válida para quem só encosta o dedo.
-      const ctx = canvas!.getContext('2d')
+      // Um toque seco também marca: um ponto é assinatura válida para quem só
+      // encosta o dedo.
+      const ctx = contexto()
       const p = ultimo.current
       if (ctx && p) {
         ctx.beginPath()
@@ -121,33 +151,56 @@ export function SignaturePad({
         ctx.fillStyle = '#1a1d21'
         ctx.fill()
       }
-      setTemTraco(true)
     }
 
     function mover(e: PointerEvent) {
       if (!desenhando.current) return
       e.preventDefault()
-      const ctx = canvas!.getContext('2d')
+      const ctx = contexto()
       const de = ultimo.current
       if (!ctx || !de) return
 
-      const para = posicao(e)
+      // `getCoalescedEvents` devolve as posições que o navegador juntou entre
+      // dois quadros. Num movimento rápido isso é a diferença entre uma curva
+      // e uma sequência de retas.
+      const pontos = e.getCoalescedEvents?.() ?? [e]
       ctx.beginPath()
       ctx.moveTo(de.x, de.y)
-      ctx.lineTo(para.x, para.y)
+      let fim = de
+      for (const ponto of pontos) {
+        fim = posicao(ponto)
+        ctx.lineTo(fim.x, fim.y)
+      }
       ctx.stroke()
-      ultimo.current = para
+      ultimo.current = fim
+    }
+
+    function soltar(e: PointerEvent) {
+      if (!desenhando.current) return
+      try {
+        canvas!.releasePointerCapture(e.pointerId)
+      } catch {
+        // Já liberado, ou nunca capturado.
+      }
+      terminar()
     }
 
     canvas.addEventListener('pointerdown', comecar, { passive: false })
-    window.addEventListener('pointermove', mover, { passive: false })
+    canvas.addEventListener('pointermove', mover, { passive: false })
+    canvas.addEventListener('pointerup', soltar)
+    // `pointercancel` NÃO chama `terminar` cedo demais: com a captura ativa
+    // ele quase não acontece, e quando acontece é melhor guardar o que já foi
+    // desenhado do que descartar o traço.
+    canvas.addEventListener('pointercancel', soltar)
+    // Rede de segurança: se o dedo soltar fora do quadro, o canvas não recebe
+    // o `pointerup` e o traço ficaria "aberto" para sempre.
     window.addEventListener('pointerup', terminar)
-    window.addEventListener('pointercancel', terminar)
     return () => {
       canvas.removeEventListener('pointerdown', comecar)
-      window.removeEventListener('pointermove', mover)
+      canvas.removeEventListener('pointermove', mover)
+      canvas.removeEventListener('pointerup', soltar)
+      canvas.removeEventListener('pointercancel', soltar)
       window.removeEventListener('pointerup', terminar)
-      window.removeEventListener('pointercancel', terminar)
     }
   }, [disabled, terminar])
 
