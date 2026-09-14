@@ -189,6 +189,15 @@ function inteiroPorExtenso(n: number): string {
 }
 
 /**
+ * "16" → "dezesseis". Usado no termo para escrever a quantidade de dias do
+ * cálculo proporcional — pelo mesmo motivo do valor: número por extenso não
+ * se altera com um dígito.
+ */
+export function numeroPorExtenso(n: number): string {
+  return inteiroPorExtenso(Math.max(0, Math.floor(n)))
+}
+
+/**
  * "R$ 1.240,50" → "mil, duzentos e quarenta reais e cinquenta centavos".
  * Recibo sem valor por extenso é frágil: um dígito alterado passa despercebido,
  * e é justamente o que se contesta numa disputa.

@@ -1,8 +1,20 @@
 import { useMemo, useState } from 'react'
 import { Sheet, Label, fieldClass } from './Sheet'
 import { SignaturePad } from './SignaturePad'
-import { formatMoney, formatPeriod } from '../lib/calc'
-import { isValidCpf, maskCpf, maskDoc, onlyDigits, valorPorExtenso } from '../lib/receipt'
+import {
+  formatMoney,
+  formatPeriod,
+  proportionalForPeriod,
+  type Proporcional,
+} from '../lib/calc'
+import {
+  isValidCpf,
+  maskCpf,
+  maskDoc,
+  numeroPorExtenso,
+  onlyDigits,
+  valorPorExtenso,
+} from '../lib/receipt'
 import type { Company, PaymentMethod, Person } from '../lib/types'
 
 export interface SignResult {
@@ -31,6 +43,7 @@ export function montarTermo(
   payer: Company,
   quita: boolean,
   saldoRestante: number,
+  proporcional?: Proporcional | null,
 ): string {
   // Quem pagou entra no termo por nome e documento. Um recibo que não diz de
   // quem o dinheiro veio prova pouco — e é justamente essa parte que estava
@@ -48,11 +61,28 @@ export function montarTermo(
     : `dando quitação apenas do valor ora recebido, a título de adiantamento, ` +
       `permanecendo em aberto o saldo de ${formatMoney(saldoRestante)} referente ao período`
 
+  // Valor proporcional precisa dizer por quê. Um recibo de R$ 1.066,67 para
+  // quem ganha R$ 2.000 levanta dúvida em qualquer conferência futura — e a
+  // dúvida é o que enfraquece o documento. Declarar a base de cálculo no
+  // próprio termo é o que torna o valor verificável anos depois, sem depender
+  // de ninguém lembrar o que houve.
+  const proporcionalidade = proporcional
+    ? ` O valor corresponde ao período proporcional de ${proporcional.dias} ` +
+      `(${numeroPorExtenso(proporcional.dias)}) dias sobre o mês comercial de ` +
+      `${proporcional.base} dias, em razão ${
+        proporcional.motivo === 'saida'
+          ? 'do encerramento do vínculo'
+          : proporcional.motivo === 'ambos'
+            ? 'do início e do encerramento do vínculo'
+            : 'do início do vínculo'
+      } no curso do período.`
+    : ''
+
   return (
     `Eu, ${nome}, inscrita(o) no CPF nº ${maskCpf(doc)}, DECLARO ter recebido ` +
     `${de}a quantia de ${formatMoney(valor)} (${valorPorExtenso(valor)}), ` +
     `por meio de ${method}, referente aos serviços prestados no período de ` +
-    `${formatPeriod(period)}, ${quitacao}. ` +
+    `${formatPeriod(period)}, ${quitacao}.${proporcionalidade} ` +
     `Confirmo que a assinatura abaixo é de meu próprio punho e que assino ` +
     `eletronicamente, de forma livre e consciente, nos termos da Lei nº 14.063/2020.`
   )
@@ -98,6 +128,19 @@ export function SignSheet({
 
   const docLimpo = onlyDigits(doc)
   const docOk = isValidCpf(docLimpo)
+
+  // Calcula aqui em vez de receber por prop: o sheet já tem a pessoa e o mês,
+  // que é tudo de que a conta precisa — e menos uma prop para alguém esquecer
+  // de passar num caminho novo, deixando o recibo sem a justificativa.
+  //
+  // Só entra no termo quando o valor pago de fato corresponde ao proporcional:
+  // num vale, ou num acerto ajustado à mão, declarar a base de cálculo seria
+  // descrever uma conta que não foi a usada.
+  const proporcionalDoMes = proportionalForPeriod(person, period)
+  const proporcional =
+    proporcionalDoMes && Math.abs(proporcionalDoMes.valor - valor) < 0.01
+      ? proporcionalDoMes
+      : null
   // Só mostra o erro depois que ela completou os 11 dígitos — reclamar de CPF
   // inválido enquanto ainda está digitando é ruído.
   const docErrado = docLimpo.length === 11 && !docOk
@@ -105,9 +148,19 @@ export function SignSheet({
   const termo = useMemo(
     () =>
       docOk
-        ? montarTermo(person.name, docLimpo, valor, method, period, company, quita, saldoRestante)
+        ? montarTermo(
+            person.name,
+            docLimpo,
+            valor,
+            method,
+            period,
+            company,
+            quita,
+            saldoRestante,
+            proporcional,
+          )
         : '',
-    [person.name, docLimpo, docOk, valor, method, period, company, quita, saldoRestante],
+    [person.name, docLimpo, docOk, valor, method, period, company, quita, saldoRestante, proporcional],
   )
 
   const pronto = docOk && leu && signature !== ''
