@@ -3,9 +3,12 @@ import { DEFAULT_MONTHLY_HOURS } from './types'
 /**
  * Horas extras.
  *
- * A conta é a da folha: o salário dividido pelas horas do mês dá o valor da
- * hora normal, o percentual acrescenta o adicional, e o total é isso vezes o
- * tempo trabalhado a mais.
+ * A conta: o salário dividido pelas horas do mês dá o valor da hora normal, o
+ * percentual diz quanto dessa hora se paga, e o total é isso vezes o tempo
+ * trabalhado a mais.
+ *
+ * O percentual é a FATIA da hora, não um acréscimo: 100% paga a hora cheia,
+ * 200% paga o dobro, 50% paga metade.
  *
  * Tudo aqui trabalha em MINUTOS. Hora extra raramente é redonda — "uma hora e
  * quarenta" é o caso comum, não a exceção —, e guardar 1,6667 h introduziria
@@ -14,19 +17,25 @@ import { DEFAULT_MONTHLY_HOURS } from './types'
  */
 
 /** Percentuais que viram atalho na tela. O resto vai no campo livre. */
-export const PERCENTUAIS_COMUNS = [50, 100, 200] as const
+export const PERCENTUAIS_COMUNS = [50, 100, 150, 200] as const
 
-/** O que cada percentual costuma significar — vira dica na interface. */
+/**
+ * O que cada percentual paga, em relação à hora normal.
+ *
+ * O número é a FATIA da hora, não um acréscimo sobre ela: 100% paga a hora
+ * cheia, 50% paga metade. Dizer "adicional" aqui levaria a pagar o dobro.
+ */
 export const MOTIVO_PERCENTUAL: Record<number, string> = {
-  50: 'dia comum',
-  100: 'domingo ou feriado',
-  200: 'dobro',
+  50: 'metade da hora',
+  100: 'hora cheia',
+  150: 'uma hora e meia',
+  200: 'o dobro',
 }
 
 export interface ValorHoraExtra {
   /** Valor de uma hora normal de trabalho. */
   hora: number
-  /** Valor de uma hora já com o adicional aplicado. */
+  /** Quanto vale a hora extra: a hora normal vezes o percentual. */
   horaComAdicional: number
   /** Minutos trabalhados a mais. */
   minutos: number
@@ -42,8 +51,11 @@ export interface ValorHoraExtra {
  * Quanto pagar por um tempo extra.
  *
  * `minutos` aceita qualquer valor — 90 é uma hora e meia, 25 é vinte e cinco
- * minutos. `percentual` é o adicional sobre a hora normal: 50 significa uma
- * vez e meia, 100 significa o dobro.
+ * minutos.
+ *
+ * `percentual` é QUANTO DA HORA NORMAL se paga, não um acréscimo sobre ela:
+ * 100 paga a hora cheia, 50 paga metade, 200 paga o dobro. Ler isso como
+ * adicional dobraria o valor de cada hora extra.
  */
 export function calcularHoraExtra(
   salario: number,
@@ -56,7 +68,7 @@ export function calcularHoraExtra(
   const divisor = horasMes > 0 ? horasMes : DEFAULT_MONTHLY_HOURS
 
   const hora = salario / divisor
-  const horaComAdicional = hora * (1 + percentual / 100)
+  const horaComAdicional = hora * (percentual / 100)
   const minutosValidos = Math.max(0, minutos)
   const total = (horaComAdicional / 60) * minutosValidos
 

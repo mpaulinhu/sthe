@@ -159,7 +159,7 @@ export function HorasPage({
                 <input
                   value={tempo}
                   onChange={(e) => setTempo(e.target.value)}
-                  placeholder="1:30"
+                  placeholder="1:30 ou 1,5"
                   aria-label="Tempo trabalhado a mais"
                   className={`${fieldClass} text-[16px] tabular-nums ${
                     tempo && minutos === null ? 'border-late' : ''
@@ -177,20 +177,17 @@ export function HorasPage({
               </label>
             </div>
 
-            <span
-              className={`-mt-2 text-[12px] leading-snug ${
-                tempo && minutos === null ? 'text-late' : 'text-ink-dim'
-              }`}
-            >
-              {tempo && minutos === null
-                ? 'Não entendi. Use 1:30, 1h30, 1,5 ou 2.'
-                : minutos !== null
-                  ? `${formatarMinutos(minutos)} de trabalho a mais.`
-                  : 'Pode escrever 1:30, 1h30 ou 1,5 — tudo dá uma hora e meia.'}
-            </span>
+            {/* Só o erro, e só quando há erro. Repetir o tempo traduzido a
+                cada tecla ("1h30 de trabalho a mais") não acrescenta nada: a
+                conta logo abaixo já mostra o tempo que está sendo usado. */}
+            {tempo && minutos === null ? (
+              <span className="-mt-2 text-[12px] leading-snug text-late">
+                Não entendi. Use 1:30, 1h30, 1,5 ou 2.
+              </span>
+            ) : null}
 
             <div className="flex flex-col gap-2">
-              <Label>Adicional sobre a hora</Label>
+              <Label>Quanto pagar por hora</Label>
               <div className="flex flex-wrap gap-1.5">
                 {PERCENTUAIS_COMUNS.map((p) => (
                   <button
@@ -234,9 +231,9 @@ export function HorasPage({
                   nota="valor da hora normal"
                 />
                 <LinhaConta
-                  rotulo={`+ ${conta.percentual}% de adicional`}
+                  rotulo={`${conta.percentual}% da hora`}
                   valor={formatMoney(conta.horaComAdicional)}
-                  nota="hora extra"
+                  nota="valor da hora extra"
                 />
                 <LinhaConta
                   rotulo={`× ${formatarMinutos(conta.minutos)}`}
@@ -324,8 +321,8 @@ export function HorasPage({
           )}
 
           <p className="mt-4 text-[12px] leading-relaxed text-ink-dim">
-            A hora normal sai de {horasMes} horas no mês, ajustável em Configurações. O adicional
-            soma sobre ela: 100% é o dobro da hora, não o dobro do salário.
+            A hora normal sai de {horasMes} horas no mês, ajustável em Configurações. O
+            percentual é quanto dessa hora se paga: 100% é a hora cheia, 200% é o dobro dela.
           </p>
         </Panel>
       </div>

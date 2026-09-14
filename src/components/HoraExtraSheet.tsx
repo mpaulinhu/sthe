@@ -113,7 +113,7 @@ export function HoraExtraSheet({
         <input
           value={tempo}
           onChange={(e) => setTempo(e.target.value)}
-          placeholder="1:30"
+          placeholder="1:30 ou 1,5"
           inputMode="text"
           autoFocus
           aria-label="Tempo trabalhado a mais"
@@ -121,21 +121,17 @@ export function HoraExtraSheet({
             tempo && minutos === null ? 'border-late' : ''
           }`}
         />
-        <span
-          className={`text-[12px] leading-snug ${
-            tempo && minutos === null ? 'text-late' : 'text-ink-dim'
-          }`}
-        >
-          {tempo && minutos === null
-            ? 'Não entendi. Use 1:30, 1h30, 90 minutos ou 1,5.'
-            : minutos !== null
-              ? `${formatarMinutos(minutos)} de trabalho a mais.`
-              : 'Pode escrever 1:30, 1h30 ou 1,5 — tudo dá uma hora e meia.'}
-        </span>
+        {/* Só o erro, e só quando há erro — a conta abaixo já mostra o tempo
+            que está sendo usado. */}
+        {tempo && minutos === null ? (
+          <span className="text-[12px] leading-snug text-late">
+            Não entendi. Use 1:30, 1h30, 1,5 ou 2.
+          </span>
+        ) : null}
       </label>
 
       <div className="flex flex-col gap-2">
-        <Label>Adicional sobre a hora</Label>
+        <Label>Quanto pagar por hora</Label>
         <div className="flex flex-wrap gap-1.5">
           {PERCENTUAIS_COMUNS.map((p) => (
             <button
@@ -190,9 +186,9 @@ export function HoraExtraSheet({
             nota="valor da hora normal"
           />
           <Linha
-            rotulo={`+ ${conta.percentual}% de adicional`}
+            rotulo={`${conta.percentual}% da hora`}
             valor={formatMoney(conta.horaComAdicional)}
-            nota="hora extra"
+            nota="valor da hora extra"
           />
           <Linha
             rotulo={`× ${formatarMinutos(conta.minutos)}`}
@@ -205,8 +201,8 @@ export function HoraExtraSheet({
 
       <p className="text-[12px] leading-relaxed text-ink-dim">
         A hora normal sai de {conta?.horasMes ?? horasMes} horas no mês, ajustável em
-        Configurações. O adicional soma sobre ela: 100% quer dizer o dobro da hora, não o dobro do
-        salário.
+        Configurações. O percentual é quanto dessa hora se paga: 100% é a hora cheia, 200% é o
+        dobro dela.
       </p>
     </Sheet>
   )
