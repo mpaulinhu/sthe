@@ -59,6 +59,20 @@ export interface Person {
    * `compressAvatar`). Opcional: sem foto, o avatar mostra as iniciais do nome.
    */
   photo?: string
+  /**
+   * Data de admissão (YYYY-MM-DD), opcional.
+   *
+   * Diferente de `createdAt`, que é quando o cadastro foi criado no app —
+   * alguém que trabalha há dois anos pode ter sido cadastrada ontem. É esta
+   * data que diz se o primeiro mês foi cheio ou proporcional.
+   */
+  hiredAt?: string
+  /**
+   * Último dia de trabalho (YYYY-MM-DD), opcional. Marca o mês da saída como
+   * proporcional — e, ao contrário de `inactivatedAt`, é uma data combinada
+   * que pode estar no futuro (aviso prévio já acertado).
+   */
+  leftAt?: string
   active: boolean
   /** Quando ela deixou de trabalhar aqui — só existe se `active` for false. */
   inactivatedAt?: string

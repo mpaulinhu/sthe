@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Sheet, Label, Segmented, fieldClass } from './Sheet'
 import { MoneyInput } from './MoneyInput'
-import { formatMoney } from '../lib/calc'
+import { formatMoney, proportionalForPeriod } from '../lib/calc'
 import { centsToNumber, numberToCents } from '../lib/money'
 import { compressImage, dataUrlKb } from '../lib/image'
 import {
@@ -43,6 +43,7 @@ export function ValueSheet({
   mode,
   person,
   summary,
+  period,
   onConfirm,
   onClose,
   onError,
@@ -50,6 +51,8 @@ export function ValueSheet({
   mode: 'pagar' | 'lancar'
   person: Person
   summary: PersonSummary
+  /** Mês aberto — o proporcional depende de qual mês está sendo lançado. */
+  period: string
   onConfirm: (r: ValueResult) => void
   onClose: () => void
   onError: (msg: string) => void
@@ -63,12 +66,21 @@ export function ValueSheet({
   const faltaVale = numberToCents(summary.faltaVale)
   const pagandoVale = faltaVale > 0 && sugestao === faltaVale && faltaVale < falta
 
+  /**
+   * No mês em que a pessoa entra ou sai, o salário não é cheio. O lançamento
+   * já vem com o valor proporcional, e a nota diz de onde ele saiu — sugerir
+   * sem explicar deixaria um número estranho sem justificativa.
+   */
+  const proporcional = proportionalForPeriod(person, period)
+
   const kindInicial = defaultKindFor(person.contract)
 
   // Ao lançar, já vem preenchido com o valor combinado no cadastro (salário
   // mensal, diária ou referência) — é para isso que aquele campo existe.
   // Ela só ajusta quando o mês foge do padrão, em vez de redigitar sempre.
-  const [cents, setCents] = useState(mode === 'pagar' ? sugestao : base)
+  const [cents, setCents] = useState(
+    mode === 'pagar' ? sugestao : numberToCents(proporcional?.valor ?? person.baseAmount),
+  )
   const [kind, setKind] = useState<EntryKind>(kindInicial)
   // A forma habitual da pessoa já vem escolhida — trocar aqui vale só para
   // este pagamento, sem mexer no cadastro dela.
@@ -196,6 +208,23 @@ export function ValueSheet({
                 {n}×
               </button>
             ))}
+          </div>
+        ) : null}
+
+        {/* Por que o valor não é o salário cheio. Sem esta linha o número
+            pareceria errado — e ela ajustaria à mão sem saber que o app já
+            tinha feito a conta. */}
+        {!isPagar && proporcional ? (
+          <div className="rounded-[11px] border border-butterfly-200 bg-butterfly-50 px-3 py-2.5">
+            <p className="text-[12.5px] leading-relaxed text-butterfly-700">
+              {proporcional.motivo === 'saida'
+                ? `Último mês: ${proporcional.dias} de ${proporcional.base} dias.`
+                : proporcional.motivo === 'ambos'
+                  ? `Entrou e saiu neste mês: ${proporcional.dias} de ${proporcional.base} dias.`
+                  : `Primeiro mês: ${proporcional.dias} de ${proporcional.base} dias.`}{' '}
+              Sugeri {formatMoney(proporcional.valor)} em vez de{' '}
+              {formatMoney(person.baseAmount)} — ajuste se combinaram diferente.
+            </p>
           </div>
         ) : null}
 

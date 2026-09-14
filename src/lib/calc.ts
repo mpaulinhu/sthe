@@ -134,6 +134,12 @@ export function peopleVisibleInPeriod(
   )
 
   return people.filter((p) => {
+    // Admissão e saída valem para todos os tipos de contrato: um mês anterior
+    // à entrada (ou posterior à saída) não é mês dela, e listá-la ali sugeriria
+    // uma dívida que não existe. Só não esconde quem já tem lançamento no mês
+    // — se há dinheiro registrado, a linha precisa aparecer para ser corrigida.
+    if (!activeInPeriod(p, period) && !comLancamento.has(p.id)) return false
+
     if (p.contract !== 'fixo') {
       return comLancamento.has(p.id) || comMembership.has(p.id)
     }
@@ -420,21 +426,32 @@ export function buildFixedSalaries(
   return people
     .filter((p) => {
       if (!p.active || p.baseAmount <= 0 || jaTem.has(p.id)) return false
+      // Mês fora do vínculo não gera lançamento: antes da admissão ou depois
+      // da saída não há salário a lançar.
+      if (!activeInPeriod(p, period)) return false
       return p.contract === 'fixo' || noMes.has(p.id)
     })
-    .map((p) => ({
-      id: makeId(),
-      personId: p.id,
-      period,
-      // Cada tipo de contrato lança sob o próprio nome — "salário" para um
-      // freelancer sairia errado no recibo e no relatório por função.
-      kind: defaultKindFor(p.contract),
-      amount: p.baseAmount,
-      date: resolvePayDate(period, p, workDays),
-      paid: false,
-      description: '',
-      createdAt: new Date().toISOString(),
-    }))
+    .map((p) => {
+      // No mês de entrada ou de saída o valor nasce proporcional aos dias, e a
+      // descrição diz de onde ele veio — o lançamento é automático, então sem
+      // essa nota o número apareceria sem explicação na lista.
+      const proporcional = proportionalForPeriod(p, period)
+      return {
+        id: makeId(),
+        personId: p.id,
+        period,
+        // Cada tipo de contrato lança sob o próprio nome — "salário" para um
+        // freelancer sairia errado no recibo e no relatório por função.
+        kind: defaultKindFor(p.contract),
+        amount: proporcional ? proporcional.valor : p.baseAmount,
+        date: resolvePayDate(period, p, workDays),
+        paid: false,
+        description: proporcional
+          ? `Proporcional · ${proporcional.dias} de ${proporcional.base} dias`
+          : '',
+        createdAt: new Date().toISOString(),
+      }
+    })
 }
 
 /** O dia `day` dentro do período, respeitando meses mais curtos (31 → 28/30). */
@@ -505,6 +522,83 @@ export function resolveAdvanceDate(
 export function advanceAmount(person: Pick<Person, 'advance' | 'baseAmount'>): number {
   if (!person.advance) return 0
   return Math.round(person.baseAmount * (person.advance.percent / 100) * 100) / 100
+}
+
+/**
+ * Quanto a pessoa tem direito a receber num mês em que ela entrou ou saiu.
+ *
+ * Usa o mês comercial de 30 dias, que é a regra da folha (CLT, art. 64) e o
+ * que um contador espera ver: divide o salário por 30 e multiplica pelos dias
+ * trabalhados, contando corridos — inclusive fins de semana, porque o
+ * descanso semanal é remunerado.
+ *
+ * O último dia conta como trabalhado: quem sai no dia 10 trabalhou 10 dias,
+ * não 9.
+ *
+ * Devolve `null` quando o mês é cheio — assim quem chama distingue "o mês
+ * todo" de "proporcional que por acaso deu o valor cheio", e só mostra o
+ * aviso quando há de fato uma proporção.
+ */
+export interface Proporcional {
+  /** Dias considerados trabalhados no mês. */
+  dias: number
+  /** Sempre 30 — o divisor comercial. Explícito para a tela poder mostrar. */
+  base: number
+  /** O valor já proporcional. */
+  valor: number
+  /** Por que o mês não é cheio: entrada, saída, ou os dois no mesmo mês. */
+  motivo: 'admissao' | 'saida' | 'ambos'
+}
+
+export function proportionalForPeriod(
+  person: Pick<Person, 'baseAmount' | 'hiredAt' | 'leftAt'>,
+  period: string,
+): Proporcional | null {
+  const [ano, mes] = period.split('-').map(Number)
+  const ultimoDiaDoMes = new Date(ano, mes, 0).getDate()
+
+  const entrou = person.hiredAt?.slice(0, 7) === period
+  const saiu = person.leftAt?.slice(0, 7) === period
+  if (!entrou && !saiu) return null
+
+  // Entrou no dia 1º e ficou até o fim: trabalhou o mês inteiro, então recebe
+  // o salário cheio. Sem esta saída, um mês de 31 dias pagaria 31/30 — mais
+  // que o combinado — e quem entrou no primeiro dia útil estranharia com razão.
+  const entrouNoPrimeiro = !entrou || person.hiredAt!.slice(8, 10) === '01'
+  const saiuNoUltimo = !saiu || Number(person.leftAt!.slice(8, 10)) >= ultimoDiaDoMes
+  if (entrouNoPrimeiro && saiuNoUltimo) return null
+
+  // Fora das bordas o mês é cheio; nas bordas, o intervalo é o que sobra.
+  const primeiro = entrou ? Number(person.hiredAt!.slice(8, 10)) : 1
+  const ultimo = saiu ? Number(person.leftAt!.slice(8, 10)) : ultimoDiaDoMes
+
+  // Datas incoerentes (saída antes da entrada) não geram valor negativo.
+  const dias = Math.max(0, Math.min(ultimo, ultimoDiaDoMes) - primeiro + 1)
+
+  const base = 30
+  const valor = Math.round((person.baseAmount / base) * dias * 100) / 100
+
+  return {
+    dias,
+    base,
+    valor,
+    motivo: entrou && saiu ? 'ambos' : entrou ? 'admissao' : 'saida',
+  }
+}
+
+/**
+ * A pessoa tem vínculo neste mês?
+ *
+ * Um mês anterior à admissão, ou posterior à saída, não deveria nem listar a
+ * pessoa — ela não trabalhou ali.
+ */
+export function activeInPeriod(
+  person: Pick<Person, 'hiredAt' | 'leftAt'>,
+  period: string,
+): boolean {
+  if (person.hiredAt && period < person.hiredAt.slice(0, 7)) return false
+  if (person.leftAt && period > person.leftAt.slice(0, 7)) return false
+  return true
 }
 
 /** Mantém o dia, troca o mês/ano — respeitando meses mais curtos (31 → 28/30). */

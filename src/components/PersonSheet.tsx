@@ -2,7 +2,12 @@ import { useMemo, useState } from 'react'
 import { Sheet, Label, Segmented, fieldClass } from './Sheet'
 import { MoneyInput } from './MoneyInput'
 import { centsToNumber, numberToCents } from '../lib/money'
-import { formatMoney, formatShortDate, resolvePayDate } from '../lib/calc'
+import {
+  formatMoney,
+  formatShortDate,
+  proportionalForPeriod,
+  resolvePayDate,
+} from '../lib/calc'
 import {
   CONTRACT_SHORT,
   PAYMENT_METHODS,
@@ -69,6 +74,8 @@ export function PersonSheet({
   const [payDay, setPayDay] = useState(initial ? String(initial.payDay) : '')
   const [payDayMode, setPayDayMode] = useState<PayDayMode>(initial?.payDayMode ?? 'fixo')
   // Vale: opcional, e por isso começa desligado em quem nunca teve um.
+  const [hiredAt, setHiredAt] = useState(initial?.hiredAt ?? '')
+  const [leftAt, setLeftAt] = useState(initial?.leftAt ?? '')
   const [temVale, setTemVale] = useState(Boolean(initial?.advance))
   const [valeDia, setValeDia] = useState(initial?.advance ? String(initial.advance.day) : '20')
   const [valeModo, setValeModo] = useState<PayDayMode>(initial?.advance?.mode ?? 'fixo')
@@ -108,6 +115,27 @@ export function PersonSheet({
   const diaResolvido = Number(dataResolvida.slice(8, 10))
   const ajustado = payDayMode === 'fixo' ? diaResolvido !== diaDigitado : null
 
+  /**
+   * O que o proporcional faria com o mês de entrada ou de saída.
+   *
+   * Mostrado enquanto ela digita, porque "20 de 30 dias" é mais fácil de
+   * conferir agora do que descobrir o valor estranho no dia de pagar.
+   */
+  const previaProporcional = useMemo(() => {
+    const base = centsToNumber(cents)
+    if (!base) return ''
+    for (const [data, rotulo] of [
+      [hiredAt, 'Entrando'],
+      [leftAt, 'Saindo'],
+    ] as const) {
+      if (!data) continue
+      const r = proportionalForPeriod({ baseAmount: base, hiredAt, leftAt }, data.slice(0, 7))
+      if (!r) continue
+      return `${rotulo} em ${formatShortDate(data)}: ${r.dias} de ${r.base} dias — ${formatMoney(r.valor)} nesse mês.`
+    }
+    return ''
+  }, [cents, hiredAt, leftAt])
+
   function confirm() {
     if (!name.trim()) {
       onError('Falta o nome.')
@@ -128,6 +156,8 @@ export function PersonSheet({
       baseAmount: centsToNumber(cents),
       payDay: diaDigitado,
       payDayMode,
+      hiredAt: hiredAt || undefined,
+      leftAt: leftAt || undefined,
       advance: temVale
         ? {
             day: Math.min(31, Math.max(1, Number(valeDia) || 20)),
@@ -286,6 +316,47 @@ export function PersonSheet({
             ? `Este mês não tem dia ${diaDigitado} — cai em ${formatShortDate(dataResolvida)}.`
             : `Neste mês, cai em ${formatShortDate(dataResolvida)}.`}
         </p>
+      </div>
+
+      {/* Admissão e saída: opcionais, e só existem para o cálculo do mês de
+          borda. Quem sempre trabalhou aqui pode deixar em branco. */}
+      <div className="flex flex-col gap-2">
+        <Label optional>Entrada e saída</Label>
+        <div className="flex gap-3">
+          <label className="flex flex-1 flex-col gap-[7px]">
+            <span className="text-[12px] text-ink-faint">Admissão</span>
+            <input
+              type="date"
+              value={hiredAt}
+              onChange={(e) => setHiredAt(e.target.value)}
+              aria-label="Data de admissão"
+              className={fieldClass}
+            />
+          </label>
+          <label className="flex flex-1 flex-col gap-[7px]">
+            <span className="text-[12px] text-ink-faint">Último dia</span>
+            <input
+              type="date"
+              value={leftAt}
+              onChange={(e) => setLeftAt(e.target.value)}
+              aria-label="Último dia de trabalho"
+              className={fieldClass}
+            />
+          </label>
+        </div>
+
+        {/* Prévia do que muda: o proporcional do mês de entrada ou saída,
+            calculado na hora para ela conferir antes de salvar. */}
+        {previaProporcional ? (
+          <p className="text-[12px] leading-snug text-butterfly-600">
+            {previaProporcional}
+          </p>
+        ) : (
+          <p className="text-[12px] leading-snug text-ink-dim">
+            Deixe em branco se ela já trabalhava aqui. No mês em que entra ou
+            sai, o app sugere o valor proporcional aos dias.
+          </p>
+        )}
       </div>
 
       {/* Vale: um segundo pagamento no meio do mês.

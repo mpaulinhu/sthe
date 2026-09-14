@@ -917,6 +917,7 @@ export default function App() {
           mode={sheet.mode}
           person={sheet.person}
           summary={alvoSummary}
+          period={period}
           onConfirm={(r) =>
             sheet.mode === 'pagar'
               ? registrarPagamento(sheet.person, r)
