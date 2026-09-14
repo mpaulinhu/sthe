@@ -863,45 +863,45 @@ describe('destaque = a menor das duas datas por vencer', () => {
   })
 })
 
-describe('proporcional de admissão e saída', () => {
+describe('proporcional de admissão e saída (regime de mês vencido)', () => {
+  // O que sai em outubro remunera setembro. Por isso os testes passam o mês de
+  // PAGAMENTO e conferem os dias do mês ANTERIOR.
   const p = (over: Partial<Person>) => person({ baseAmount: 3000, ...over })
+  const PAGA_EM_OUT = '2026-10' // remunera setembro (30 dias)
+  const PAGA_EM_SET = '2026-09' // remunera agosto (31 dias)
+  const PAGA_EM_MAR = '2026-03' // remunera fevereiro (28 dias)
 
   it('mês sem entrada nem saída é cheio — devolve null', () => {
-    expect(proportionalForPeriod(p({}), '2026-08')).toBeNull()
-    expect(proportionalForPeriod(p({ hiredAt: '2026-03-10' }), '2026-08')).toBeNull()
+    expect(proportionalForPeriod(p({}), PAGA_EM_OUT)).toBeNull()
+    expect(proportionalForPeriod(p({ hiredAt: '2026-03-10' }), PAGA_EM_OUT)).toBeNull()
   })
 
-  it('admitida no dia 11 de um mês de 30 dias recebe 20/30', () => {
-    const r = proportionalForPeriod(p({ hiredAt: '2026-09-11' }), '2026-09')!
+  it('admitida em 11/09 recebe 20/30 no pagamento de outubro', () => {
+    const r = proportionalForPeriod(p({ hiredAt: '2026-09-11' }), PAGA_EM_OUT)!
     expect(r.dias).toBe(20)
     expect(r.valor).toBe(2000)
     expect(r.motivo).toBe('admissao')
   })
 
   it('admitida no dia 1º recebe o mês cheio, sem proporcional', () => {
-    // Trabalhou o mês inteiro. Sem esta regra, um mês de 31 dias pagaria
-    // 31/30 = mais que o salário combinado.
-    expect(proportionalForPeriod(p({ hiredAt: '2026-08-01' }), '2026-08')).toBeNull()
-    expect(proportionalForPeriod(p({ hiredAt: '2026-09-01' }), '2026-09')).toBeNull()
+    expect(proportionalForPeriod(p({ hiredAt: '2026-09-01' }), PAGA_EM_OUT)).toBeNull()
   })
 
   it('quem sai no último dia do mês também recebe cheio', () => {
-    expect(proportionalForPeriod(p({ leftAt: '2026-09-30' }), '2026-09')).toBeNull()
-    expect(proportionalForPeriod(p({ leftAt: '2026-02-28' }), '2026-02')).toBeNull()
+    expect(proportionalForPeriod(p({ leftAt: '2026-09-30' }), PAGA_EM_OUT)).toBeNull()
+    expect(proportionalForPeriod(p({ leftAt: '2026-02-28' }), PAGA_EM_MAR)).toBeNull()
   })
 
   it('mês de 31 dias desconta o dia perdido, não paga cheio', () => {
-    // Admitida em 02/08 (31 dias): trabalha 30 dias corridos, mas perdeu um
-    // dia. Contar 30/30 pagaria o salário inteiro como se não tivesse perdido.
-    const r = proportionalForPeriod(p({ hiredAt: '2026-08-02' }), '2026-08')!
+    // Admitida 02/08 (31 dias): trabalha 30 corridos, mas perdeu um dia.
+    const r = proportionalForPeriod(p({ hiredAt: '2026-08-02' }), PAGA_EM_SET)!
     expect(r.dias).toBe(29)
     expect(r.base).toBe(30)
     expect(r.valor).toBe(2900)
   })
 
   it('o último dia conta como trabalhado', () => {
-    // Saiu dia 10: trabalhou 10 dias, não 9.
-    const r = proportionalForPeriod(p({ leftAt: '2026-09-10' }), '2026-09')!
+    const r = proportionalForPeriod(p({ leftAt: '2026-09-10' }), PAGA_EM_OUT)!
     expect(r.dias).toBe(10)
     expect(r.valor).toBe(1000)
     expect(r.motivo).toBe('saida')
@@ -910,7 +910,7 @@ describe('proporcional de admissão e saída', () => {
   it('entrou e saiu no mesmo mês conta só o intervalo', () => {
     const r = proportionalForPeriod(
       p({ hiredAt: '2026-09-06', leftAt: '2026-09-15' }),
-      '2026-09',
+      PAGA_EM_OUT,
     )!
     expect(r.dias).toBe(10)
     expect(r.motivo).toBe('ambos')
@@ -918,50 +918,46 @@ describe('proporcional de admissão e saída', () => {
 
   it('fevereiro: admitida dia 15 conta metade do mês', () => {
     // 14 dias corridos num mês de 28; sobre a base 30 isso vira 16, porque
-    // fevereiro "vale" 30 dias na folha — quem trabalha metade dele recebe
-    // mais que 14/30.
-    const r = proportionalForPeriod(p({ hiredAt: '2026-02-15' }), '2026-02')!
+    // fevereiro "vale" 30 dias na folha.
+    const r = proportionalForPeriod(p({ hiredAt: '2026-02-15' }), PAGA_EM_MAR)!
     expect(r.dias).toBe(16)
     expect(r.valor).toBe(1600)
   })
 
   it('a proporção é comparável entre meses de tamanhos diferentes', () => {
-    // Entrar no dia 15 é meio mês em qualquer calendário. Sem o ajuste de
-    // base, fevereiro pagaria 14/30 e março 17/30 pela mesma metade.
-    const fev = proportionalForPeriod(p({ hiredAt: '2026-02-15' }), '2026-02')!
-    const mar = proportionalForPeriod(p({ hiredAt: '2026-03-15' }), '2026-03')!
+    const fev = proportionalForPeriod(p({ hiredAt: '2026-02-15' }), '2026-03')!
+    const mar = proportionalForPeriod(p({ hiredAt: '2026-03-15' }), '2026-04')!
     expect(Math.abs(fev.dias - mar.dias)).toBeLessThanOrEqual(1)
   })
 
   it('datas incoerentes não geram valor negativo', () => {
     const r = proportionalForPeriod(
       p({ hiredAt: '2026-09-20', leftAt: '2026-09-05' }),
-      '2026-09',
+      PAGA_EM_OUT,
     )!
     expect(r.dias).toBe(0)
     expect(r.valor).toBe(0)
   })
 
   it('arredonda ao centavo', () => {
-    const r = proportionalForPeriod(
-      { baseAmount: 2777, hiredAt: '2026-09-08' },
-      '2026-09',
-    )!
+    const r = proportionalForPeriod({ baseAmount: 2777, hiredAt: '2026-09-08' }, PAGA_EM_OUT)!
     expect(r.dias).toBe(23)
     expect(r.valor).toBe(2129.03)
   })
 })
 
-describe('activeInPeriod', () => {
-  it('mês anterior à admissão não conta', () => {
-    expect(activeInPeriod({ hiredAt: '2026-09-11' }, '2026-08')).toBe(false)
-    expect(activeInPeriod({ hiredAt: '2026-09-11' }, '2026-09')).toBe(true)
+describe('activeInPeriod (mês vencido)', () => {
+  it('quem entra em setembro só recebe a partir de outubro', () => {
+    // O pagamento de setembro remunera agosto, quando ela ainda não estava lá.
+    expect(activeInPeriod({ hiredAt: '2026-09-11' }, '2026-09')).toBe(false)
     expect(activeInPeriod({ hiredAt: '2026-09-11' }, '2026-10')).toBe(true)
+    expect(activeInPeriod({ hiredAt: '2026-09-11' }, '2026-11')).toBe(true)
   })
 
-  it('mês posterior à saída não conta', () => {
-    expect(activeInPeriod({ leftAt: '2026-09-10' }, '2026-10')).toBe(false)
-    expect(activeInPeriod({ leftAt: '2026-09-10' }, '2026-09')).toBe(true)
+  it('quem sai em setembro ainda recebe em outubro', () => {
+    // Trabalhou setembro; esse trabalho é pago em outubro.
+    expect(activeInPeriod({ leftAt: '2026-09-10' }, '2026-10')).toBe(true)
+    expect(activeInPeriod({ leftAt: '2026-09-10' }, '2026-11')).toBe(false)
   })
 
   it('sem datas, vale para qualquer mês', () => {
@@ -969,34 +965,131 @@ describe('activeInPeriod', () => {
   })
 })
 
-describe('visibilidade por admissão e saída', () => {
-  it('não lista quem ainda não foi admitida', () => {
-    const ana = person({ hiredAt: '2026-09-11' })
-    expect(peopleVisibleInPeriod([ana], [], '2026-08')).toHaveLength(0)
-    expect(peopleVisibleInPeriod([ana], [], '2026-09')).toHaveLength(1)
+describe('a data em destaque explica o status', () => {
+  // PERIOD é 2026-08, um mês no passado — então tudo nele já venceu.
+  it('em atraso, o destaque é o salário — nunca o vale futuro', () => {
+    // O bug que isso trava: a linha mostrava "20 · VALE" em vermelho quando o
+    // atrasado era o salário. Uma data que ainda não chegou não pode aparecer
+    // colada num alerta de atraso.
+    const s = summarizePerson(
+      person({ payDay: 5, advance: { day: 20, percent: 40 } }),
+      [entry('salario', 2000, false)],
+      PERIOD,
+    )
+    expect(s.atrasado).toBe(true)
+    expect(s.proximaEhVale).toBe(false)
+    expect(s.proximaData).toBe(s.dataPagamento)
   })
 
-  it('não lista quem já saiu', () => {
+  it('sem atraso, o vale assume o destaque quando é o que vem primeiro', () => {
+    // Período futuro: nada venceu, então o vale (dia 20) é a próxima conta.
+    const s = summarizePerson(
+      person({ payDay: 28, advance: { day: 20, percent: 40 } }),
+      [{ ...entry('salario', 2000, false), period: '2099-01' }],
+      '2099-01',
+    )
+    expect(s.atrasado).toBe(false)
+    expect(s.proximaEhVale).toBe(true)
+    expect(s.proximaData).toBe(s.dataVale)
+  })
+
+  it('o vale segue visível como informação mesmo com o salário em atraso', () => {
+    // `faltaVale` é o que a linha usa para mostrar "vale dia 20 · R$ X" ao
+    // lado do nome: some do destaque, mas não da tela.
+    const s = summarizePerson(
+      person({ payDay: 5, advance: { day: 20, percent: 40 } }),
+      [entry('salario', 2000, false)],
+      PERIOD,
+    )
+    expect(s.faltaVale).toBe(800)
+    expect(s.dataVale).toBe(`${PERIOD}-20`)
+  })
+})
+
+describe('destaque = a menor das duas datas por vencer', () => {
+  const FUTURO = '2099-01'
+  const noFuturo = (kind: EntryKind, amount: number) => ({
+    ...entry(kind, amount, false),
+    period: FUTURO,
+    date: `${FUTURO}-05`,
+  })
+
+  it('vale dia 20 e salário dia 5: o destaque é o dia 5', () => {
+    // O bug que isso trava: a regra antiga só perguntava "o vale já passou?",
+    // então escolhia o vale mesmo quando o salário caía antes dele.
+    const s = summarizePerson(
+      person({ payDay: 5, advance: { day: 20, percent: 40 } }),
+      [noFuturo('salario', 2000)],
+      FUTURO,
+    )
+    expect(s.proximaEhVale).toBe(false)
+    expect(s.proximaData).toBe(`${FUTURO}-05`)
+  })
+
+  it('vale dia 10 e salário dia 25: o destaque é o vale', () => {
+    const s = summarizePerson(
+      person({ payDay: 25, advance: { day: 10, percent: 40 } }),
+      [noFuturo('salario', 2000)],
+      FUTURO,
+    )
+    expect(s.proximaEhVale).toBe(true)
+    expect(s.proximaData).toBe(`${FUTURO}-10`)
+  })
+
+  it('mesmo dia para os dois: o vale ganha, por ser a primeira parcela', () => {
+    const s = summarizePerson(
+      person({ payDay: 20, advance: { day: 20, percent: 40 } }),
+      [noFuturo('salario', 2000)],
+      FUTURO,
+    )
+    expect(s.proximaEhVale).toBe(true)
+  })
+
+  it('vale já quitado sai do destaque, mesmo caindo antes', () => {
+    const s = summarizePerson(
+      person({ payDay: 25, advance: { day: 10, percent: 40 } }),
+      [noFuturo('salario', 2000), { ...noFuturo('vale', 800), paid: true }],
+      FUTURO,
+    )
+    expect(s.faltaVale).toBe(0)
+    expect(s.proximaEhVale).toBe(false)
+    expect(s.proximaData).toBe(`${FUTURO}-25`)
+  })
+})
+
+
+
+describe('visibilidade por admissão e saída (mês vencido)', () => {
+  it('quem entra em setembro aparece a partir do pagamento de outubro', () => {
+    // O pagamento de setembro remunera agosto, quando ela não estava lá.
+    const ana = person({ hiredAt: '2026-09-11' })
+    expect(peopleVisibleInPeriod([ana], [], '2026-09')).toHaveLength(0)
+    expect(peopleVisibleInPeriod([ana], [], '2026-10')).toHaveLength(1)
+  })
+
+  it('quem sai em setembro ainda aparece no pagamento de outubro', () => {
+    // Trabalhou setembro, e esse trabalho é pago em outubro.
     const ana = person({ leftAt: '2026-09-10' })
-    expect(peopleVisibleInPeriod([ana], [], '2026-10')).toHaveLength(0)
-    expect(peopleVisibleInPeriod([ana], [], '2026-09')).toHaveLength(1)
+    expect(peopleVisibleInPeriod([ana], [], '2026-10')).toHaveLength(1)
+    expect(peopleVisibleInPeriod([ana], [], '2026-11')).toHaveLength(0)
   })
 
   it('mas continua listando se houver lançamento naquele mês', () => {
     // Dinheiro registrado precisa aparecer para poder ser corrigido — esconder
     // a linha esconderia o erro junto.
     const ana = person({ leftAt: '2026-09-10' })
-    const lanc = { ...entry('salario', 1000, true), period: '2026-10' }
-    expect(peopleVisibleInPeriod([ana], [lanc], '2026-10')).toHaveLength(1)
+    const lanc = { ...entry('salario', 1000, true), period: '2026-11' }
+    expect(peopleVisibleInPeriod([ana], [lanc], '2026-11')).toHaveLength(1)
   })
 })
 
-describe('lançamento automático respeita admissão e saída', () => {
+describe('lançamento automático respeita admissão e saída (mês vencido)', () => {
   const id = () => 'x'
 
-  it('mês de entrada nasce proporcional, com a nota explicando', () => {
+  it('o pagamento seguinte à entrada nasce proporcional, com a nota', () => {
+    // Admitida 11/09; o pagamento de outubro remunera esses 20 dias.
     const ana = person({ baseAmount: 3000, hiredAt: '2026-09-11' })
-    const [e] = buildFixedSalaries([], '2026-09', [ana], id)
+    const [e] = buildFixedSalaries([], '2026-10', [ana], id)
     expect(e.amount).toBe(2000)
     expect(e.description).toBe('Proporcional · 20 de 30 dias')
   })
@@ -1008,32 +1101,37 @@ describe('lançamento automático respeita admissão e saída', () => {
     expect(e.description).toBe('')
   })
 
-  it('não lança nada antes da admissão nem depois da saída', () => {
+  it('não lança nada no mês da própria admissão', () => {
+    // Admitida em setembro: o pagamento de setembro seria por agosto, que ela
+    // não trabalhou.
     const ana = person({ baseAmount: 3000, hiredAt: '2026-09-11' })
-    expect(buildFixedSalaries([], '2026-08', [ana], id)).toHaveLength(0)
-
-    const bia = person({ id: 'p2', baseAmount: 3000, leftAt: '2026-09-10' })
-    expect(buildFixedSalaries([], '2026-10', [bia], id)).toHaveLength(0)
+    expect(buildFixedSalaries([], '2026-09', [ana], id)).toHaveLength(0)
   })
 
-  it('mês de saída nasce proporcional', () => {
+  it('não lança mais depois do acerto final', () => {
+    // Saiu 10/09: recebe em outubro pelos dias de setembro, e nada em novembro.
+    const bia = person({ id: 'p2', baseAmount: 3000, leftAt: '2026-09-10' })
+    expect(buildFixedSalaries([], '2026-11', [bia], id)).toHaveLength(0)
+  })
+
+  it('o acerto da saída nasce proporcional no mês seguinte', () => {
     const ana = person({ baseAmount: 3000, leftAt: '2026-09-10' })
-    const [e] = buildFixedSalaries([], '2026-09', [ana], id)
+    const [e] = buildFixedSalaries([], '2026-10', [ana], id)
     expect(e.amount).toBe(1000)
     expect(e.description).toBe('Proporcional · 10 de 30 dias')
   })
 })
 
-describe('detecta salário cheio em mês proporcional', () => {
-  // PERIOD é 2026-08 (31 dias); admissão dia 12 => 20 de 30 dias.
-  const ana = () => person({ baseAmount: 3000, hiredAt: `${PERIOD}-12` })
+describe('detecta salário cheio em mês proporcional (mês vencido)', () => {
+  // PERIOD é 2026-08, então remunera julho (31 dias). Admissão 12/07 dá 20
+  // dias corridos, que sobre a base 30 viram 19.
+  const ana = () => person({ baseAmount: 3000, hiredAt: '2026-07-12' })
 
   it('acha o lançamento cheio no mês de entrada', () => {
     // O caso real: a data de admissão foi preenchida depois de o mês já ter
     // sido aberto, então o lançamento ficou com o valor cheio.
     const r = findProportionalMismatches([ana()], [entry('salario', 3000, false)], PERIOD)
     expect(r).toHaveLength(1)
-    // Agosto tem 31 dias: do dia 12 ao 31 são 20 corridos, 19 sobre a base 30.
     expect(r[0].esperado.dias).toBe(19)
     expect(r[0].esperado.valor).toBe(1900)
   })
@@ -1044,7 +1142,7 @@ describe('detecta salário cheio em mês proporcional', () => {
     // olhava o salário cheio.
     const antigo = { ...entry('salario', 1900, false), description: 'Proporcional · 19 de 30 dias' }
     const r = findProportionalMismatches(
-      [person({ baseAmount: 3000, hiredAt: `${PERIOD}-02` })],
+      [person({ baseAmount: 3000, hiredAt: '2026-07-02' })],
       [antigo],
       PERIOD,
     )

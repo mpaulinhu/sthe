@@ -611,10 +611,25 @@ export interface Proporcional {
   motivo: 'admissao' | 'saida' | 'ambos'
 }
 
+/**
+ * O mês de trabalho que um pagamento remunera.
+ *
+ * O regime é mês vencido: o que sai em outubro paga o trabalho de setembro.
+ * A tela continua navegando por mês de pagamento (é assim que ela pensa —
+ * "quanto eu pago em outubro"), e esta função é a ponte entre as duas coisas.
+ */
+export function competenceOf(period: string): string {
+  return shiftPeriod(period, -1)
+}
+
 export function proportionalForPeriod(
   person: Pick<Person, 'baseAmount' | 'hiredAt' | 'leftAt'>,
-  period: string,
+  periodoDePagamento: string,
 ): Proporcional | null {
+  // Os dias contados são os do mês TRABALHADO, não os do mês em que o
+  // dinheiro sai: quem entra em 04/10 recebe em novembro o proporcional de
+  // outubro, e em outubro não recebe nada (não trabalhou setembro).
+  const period = competenceOf(periodoDePagamento)
   const [ano, mes] = period.split('-').map(Number)
   const ultimoDiaDoMes = new Date(ano, mes, 0).getDate()
 
@@ -661,8 +676,11 @@ export function proportionalForPeriod(
  */
 export function activeInPeriod(
   person: Pick<Person, 'hiredAt' | 'leftAt'>,
-  period: string,
+  periodoDePagamento: string,
 ): boolean {
+  // Também em competência: o pagamento de outubro só existe se ela trabalhou
+  // em setembro. Quem foi admitida em outubro aparece a partir de novembro.
+  const period = competenceOf(periodoDePagamento)
   if (person.hiredAt && period < person.hiredAt.slice(0, 7)) return false
   if (person.leftAt && period > person.leftAt.slice(0, 7)) return false
   return true

@@ -4,9 +4,11 @@ import { MoneyInput } from './MoneyInput'
 import { centsToNumber, numberToCents } from '../lib/money'
 import {
   formatMoney,
+  formatPeriod,
   formatShortDate,
   proportionalForPeriod,
   resolvePayDate,
+  shiftPeriod,
 } from '../lib/calc'
 import {
   CONTRACT_SHORT,
@@ -129,9 +131,13 @@ export function PersonSheet({
       [leftAt, 'Saindo'],
     ] as const) {
       if (!data) continue
-      const r = proportionalForPeriod({ baseAmount: base, hiredAt, leftAt }, data.slice(0, 7))
+      // O pagamento sai no mês seguinte ao trabalhado (regime de mês vencido),
+      // então a prévia calcula sobre esse mês e diz quando o dinheiro cai —
+      // "nesse mês" seria enganoso, já que não é o mês da data digitada.
+      const mesDePagamento = shiftPeriod(data.slice(0, 7), 1)
+      const r = proportionalForPeriod({ baseAmount: base, hiredAt, leftAt }, mesDePagamento)
       if (!r) continue
-      return `${rotulo} em ${formatShortDate(data)}: ${r.dias} de ${r.base} dias — ${formatMoney(r.valor)} nesse mês.`
+      return `${rotulo} em ${formatShortDate(data)}: ${r.dias} de ${r.base} dias — ${formatMoney(r.valor)}, pago em ${formatPeriod(mesDePagamento).toLowerCase()}.`
     }
     return ''
   }, [cents, hiredAt, leftAt])

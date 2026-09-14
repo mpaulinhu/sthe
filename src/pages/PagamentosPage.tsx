@@ -10,6 +10,7 @@ import {
 } from '../components/Shell'
 import { PersonRow } from '../components/PersonRow'
 import {
+  competenceOf,
   formatMoney,
   formatPeriod,
   formatShortDate,
@@ -291,8 +292,9 @@ export function PagamentosPage({
                     <strong className="font-medium">
                       {divergentes[0].person.name.split(' ')[0]}
                     </strong>{' '}
-                    {divergentes[0].esperado.motivo === 'saida' ? 'sai' : 'entrou'} neste mês —
-                    trabalha {divergentes[0].esperado.dias} de {divergentes[0].esperado.base} dias.{' '}
+                    {divergentes[0].esperado.motivo === 'saida' ? 'saiu' : 'entrou'} em{' '}
+                    {formatPeriod(competenceOf(period)).toLowerCase()} — trabalhou{' '}
+                    {divergentes[0].esperado.dias} de {divergentes[0].esperado.base} dias.{' '}
                     <span className="text-ink-dim">
                       Está lançado {formatMoney(divergentes[0].entry.amount)}; o proporcional é{' '}
                       {formatMoney(divergentes[0].esperado.valor)}.
@@ -300,8 +302,9 @@ export function PagamentosPage({
                   </>
                 ) : (
                   <>
-                    <strong className="font-medium">{divergentes.length} pessoas</strong> entram ou
-                    saem neste mês e estão com o valor cheio lançado.{' '}
+                    <strong className="font-medium">{divergentes.length} pessoas</strong> entraram
+                    ou saíram em {formatPeriod(competenceOf(period)).toLowerCase()} e estão com o
+                    valor errado lançado.{' '}
                     <span className="text-ink-dim">Dá para acertar tudo de uma vez.</span>
                   </>
                 )}
