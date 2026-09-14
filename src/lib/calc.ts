@@ -129,6 +129,11 @@ export function peopleVisibleInPeriod(
   const comLancamento = new Set(
     entries.filter((e) => e.period === period).map((e) => e.personId),
   )
+  // Dinheiro que já saiu: essa linha precisa aparecer mesmo fora do vínculo,
+  // senão um pagamento feito por engano ficaria invisível e sem correção.
+  const comPagamento = new Set(
+    entries.filter((e) => e.period === period && e.paid).map((e) => e.personId),
+  )
   const comMembership = new Set(
     memberships.filter((m) => m.period === period).map((m) => m.personId),
   )
@@ -136,9 +141,13 @@ export function peopleVisibleInPeriod(
   return people.filter((p) => {
     // Admissão e saída valem para todos os tipos de contrato: um mês anterior
     // à entrada (ou posterior à saída) não é mês dela, e listá-la ali sugeriria
-    // uma dívida que não existe. Só não esconde quem já tem lançamento no mês
-    // — se há dinheiro registrado, a linha precisa aparecer para ser corrigida.
-    if (!activeInPeriod(p, period) && !comLancamento.has(p.id)) return false
+    // uma dívida que não existe.
+    //
+    // A exceção é só pagamento JÁ FEITO. Antes bastava haver lançamento, e um
+    // lançamento em aberto que sobrou de quando a data era outra mantinha a
+    // pessoa visível num mês que ela não trabalhou — agora esses lançamentos
+    // são apagados no recálculo (ver `recalcEntriesForPerson`).
+    if (!activeInPeriod(p, period) && !comPagamento.has(p.id)) return false
 
     if (p.contract !== 'fixo') {
       return comLancamento.has(p.id) || comMembership.has(p.id)
@@ -513,6 +522,43 @@ export function findProportionalMismatches(
   }
 
   return fora
+}
+
+/**
+ * Recalcula os lançamentos automáticos de uma pessoa depois que as datas dela
+ * mudaram.
+ *
+ * Mudar a admissão altera duas coisas de uma vez: quanto ela recebe nos meses
+ * de borda e em quais meses ela recebe. Sem isto, corrigir a data não surtia
+ * efeito — o valor antigo continuava lançado, e ela seguia aparecendo em
+ * meses que não trabalhou.
+ *
+ * Toca só o que o app lançou sozinho e ainda não foi pago. Valor digitado à
+ * mão não tem a descrição de proporcional; pagamento feito é história, e
+ * reescrevê-lo deixaria o recibo emitido apontando para outro número.
+ */
+export function recalcEntriesForPerson(entries: Entry[], person: Person): Entry[] {
+  const doApp = (e: Entry) =>
+    e.personId === person.id &&
+    !e.paid &&
+    e.kind === defaultKindFor(person.contract) &&
+    (e.amount === person.baseAmount || e.description.startsWith('Proporcional ·'))
+
+  return entries.flatMap((e) => {
+    if (!doApp(e)) return [e]
+
+    // Mês que ela não trabalhou: o lançamento deixa de existir.
+    if (!activeInPeriod(person, e.period)) return []
+
+    const esperado = proportionalForPeriod(person, e.period)
+    const amount = esperado ? esperado.valor : person.baseAmount
+    const description = esperado
+      ? `Proporcional · ${esperado.dias} de ${esperado.base} dias`
+      : ''
+
+    if (e.amount === amount && e.description === description) return [e]
+    return [{ ...e, amount, description }]
+  })
 }
 
 /** O dia `day` dentro do período, respeitando meses mais curtos (31 → 28/30). */

@@ -16,6 +16,7 @@ import {
   proportionalForPeriod,
   activeInPeriod,
   findProportionalMismatches,
+  recalcEntriesForPerson,
 } from './calc'
 import type { Entry, EntryKind, Person } from './types'
 
@@ -1074,12 +1075,20 @@ describe('visibilidade por admissão e saída (mês vencido)', () => {
     expect(peopleVisibleInPeriod([ana], [], '2026-11')).toHaveLength(0)
   })
 
-  it('mas continua listando se houver lançamento naquele mês', () => {
-    // Dinheiro registrado precisa aparecer para poder ser corrigido — esconder
+  it('continua listando se o pagamento JÁ FOI FEITO naquele mês', () => {
+    // Dinheiro que saiu precisa aparecer para poder ser corrigido — esconder
     // a linha esconderia o erro junto.
     const ana = person({ leftAt: '2026-09-10' })
-    const lanc = { ...entry('salario', 1000, true), period: '2026-11' }
-    expect(peopleVisibleInPeriod([ana], [lanc], '2026-11')).toHaveLength(1)
+    const pago = { ...entry('salario', 1000, true), period: '2026-11' }
+    expect(peopleVisibleInPeriod([ana], [pago], '2026-11')).toHaveLength(1)
+  })
+
+  it('mas NÃO por um lançamento em aberto que sobrou de outra data', () => {
+    // O caso real: a pessoa aparecia num mês que não trabalhou porque havia um
+    // lançamento não pago, resto de quando a admissão era outra.
+    const ana = person({ hiredAt: '2026-10-15' })
+    const sobra = { ...entry('salario', 3000, false), period: '2026-09' }
+    expect(peopleVisibleInPeriod([ana], [sobra], '2026-09')).toHaveLength(0)
   })
 })
 
@@ -1176,5 +1185,75 @@ describe('detecta salário cheio em mês proporcional (mês vencido)', () => {
     expect(
       findProportionalMismatches([veterana], [entry('salario', 3000, false)], PERIOD),
     ).toHaveLength(0)
+  })
+})
+
+describe('recalculo ao mudar as datas da pessoa', () => {
+  const ana = (over: Partial<Person> = {}) => person({ baseAmount: 3000, ...over })
+  const lanc = (period: string, amount: number, description = '') => ({
+    ...entry('salario', amount, false),
+    period,
+    description,
+  })
+
+  it('mudar a admissão recalcula o valor do mês afetado', () => {
+    // Admissão corrigida de 15/09 para 05/09: o pagamento de outubro muda de
+    // 16 para 26 dias.
+    const antes = [lanc('2026-10', 1600, 'Proporcional · 16 de 30 dias')]
+    const [e] = recalcEntriesForPerson(antes, ana({ hiredAt: '2026-09-05' }))
+    expect(e.amount).toBe(2600)
+    expect(e.description).toBe('Proporcional · 26 de 30 dias')
+  })
+
+  it('apaga o lançamento de um mês que ela não trabalhou', () => {
+    // O caso real: a pessoa aparecia em setembro por causa de um lançamento
+    // que sobrou de quando a data era outra.
+    const antes = [lanc('2026-09', 3000), lanc('2026-11', 3000)]
+    const r = recalcEntriesForPerson(antes, ana({ hiredAt: '2026-10-15' }))
+    expect(r.map((e) => e.period)).toEqual(['2026-11'])
+  })
+
+  it('o mês seguinte à admissão fica proporcional', () => {
+    const antes = [lanc('2026-11', 3000)]
+    const [e] = recalcEntriesForPerson(antes, ana({ hiredAt: '2026-10-15' }))
+    expect(e.description).toBe('Proporcional · 16 de 30 dias')
+    expect(e.amount).toBe(1600)
+  })
+
+  it('volta ao valor cheio quando a data deixa de afetar o mês', () => {
+    const antes = [lanc('2026-10', 1600, 'Proporcional · 16 de 30 dias')]
+    const [e] = recalcEntriesForPerson(antes, ana({ hiredAt: '2025-01-10' }))
+    expect(e.amount).toBe(3000)
+    expect(e.description).toBe('')
+  })
+
+  it('NÃO toca no que já foi pago', () => {
+    // Reescrever um pagamento feito deixaria o recibo emitido apontando para
+    // outro número.
+    const pago = { ...lanc('2026-09', 3000), paid: true }
+    const r = recalcEntriesForPerson([pago], ana({ hiredAt: '2026-10-15' }))
+    expect(r).toHaveLength(1)
+    expect(r[0].amount).toBe(3000)
+  })
+
+  it('NÃO toca em valor digitado à mão', () => {
+    // 2500 não é o cheio nem tem descrição de proporcional: foi escolha dela.
+    const manual = lanc('2026-10', 2500, 'acordo do mês')
+    const r = recalcEntriesForPerson([manual], ana({ hiredAt: '2026-09-15' }))
+    expect(r[0].amount).toBe(2500)
+    expect(r[0].description).toBe('acordo do mês')
+  })
+
+  it('não mexe em lançamento de outra pessoa', () => {
+    const deOutra = { ...lanc('2026-10', 3000), personId: 'p2' }
+    const r = recalcEntriesForPerson([deOutra], ana({ hiredAt: '2026-10-15' }))
+    expect(r).toHaveLength(1)
+  })
+
+  it('não mexe em vale nem em outros tipos', () => {
+    const vale = { ...entry('vale', 800, false), period: '2026-09' }
+    const r = recalcEntriesForPerson([vale], ana({ hiredAt: '2026-10-15' }))
+    expect(r).toHaveLength(1)
+    expect(r[0].amount).toBe(800)
   })
 })

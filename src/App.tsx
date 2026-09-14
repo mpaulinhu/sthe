@@ -28,6 +28,7 @@ import {
   currentPeriod,
   findProportionalMismatches,
   formatMoney,
+  recalcEntriesForPerson,
   formatPeriod,
   monthStats,
   pendingByMethod,
@@ -239,13 +240,25 @@ export default function App() {
    * segundo passo — cadastrar e trazer pro mês na mesma ação.
    */
   function upsertPerson(person: Person, entrarNoMes = false) {
-    registrar(db.people.some((p) => p.id === person.id) ? 'Edição de pessoa' : 'Nova pessoa')
-    const editando = db.people.some((p) => p.id === person.id)
+    const antiga = db.people.find((p) => p.id === person.id)
+    const editando = Boolean(antiga)
+    registrar(editando ? 'Edição de pessoa' : 'Nova pessoa')
+
+    // Mudar admissão, saída ou salário muda o que já está lançado. Recalcular
+    // aqui é o que faz a correção surtir efeito na hora — sem isso a pessoa
+    // troca a data, nada acontece na lista, e o app parece ignorá-la.
+    const mudouOCalculo =
+      Boolean(antiga) &&
+      (antiga!.hiredAt !== person.hiredAt ||
+        antiga!.leftAt !== person.leftAt ||
+        antiga!.baseAmount !== person.baseAmount)
+
     setDb((d) => ({
       ...d,
       people: editando
         ? d.people.map((p) => (p.id === person.id ? person : p))
         : [...d.people, person],
+      entries: mudouOCalculo ? recalcEntriesForPerson(d.entries, person) : d.entries,
       monthMemberships:
         !editando && entrarNoMes
           ? [...d.monthMemberships, { personId: person.id, period }]
