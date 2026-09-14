@@ -40,13 +40,20 @@ export function HorasPage({
 }) {
   const horasMes = company.monthlyHours || DEFAULT_MONTHLY_HOURS
 
-  const [personId, setPersonId] = useState(people[0]?.id ?? '')
+  // Por nome: com a equipe inteira na lista, a ordem de cadastro obriga a
+  // procurar pessoa por pessoa.
+  const ordenadas = useMemo(
+    () => [...people].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+    [people],
+  )
+
+  const [personId, setPersonId] = useState(ordenadas[0]?.id ?? '')
   const [tempo, setTempo] = useState('')
   const [percentual, setPercentual] = useState(50)
   const [percentualLivre, setPercentualLivre] = useState('')
   const [data, setData] = useState(() => new Date().toISOString().slice(0, 10))
 
-  const pessoa = people.find((p) => p.id === personId) ?? people[0]
+  const pessoa = ordenadas.find((p) => p.id === personId) ?? ordenadas[0]
   const minutos = lerTempo(tempo)
 
   const conta = useMemo(
@@ -135,7 +142,7 @@ export function HorasPage({
                 onChange={(e) => setPersonId(e.target.value)}
                 className={`${fieldClass} cursor-pointer`}
               >
-                {people.map((p) => (
+                {ordenadas.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>

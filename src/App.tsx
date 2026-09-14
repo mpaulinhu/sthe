@@ -929,7 +929,13 @@ export default function App() {
 
         {tab === 'horas' ? (
           <HorasPage
-            people={peopleDoMes}
+            /* Todo mundo ativo, não só quem já aparece no mês.
+               `peopleDoMes` existe para a lista de Pagamentos, onde faz
+               sentido esconder freelancer sem lançamento e quem ainda não tem
+               vínculo no mês. Aqui é o contrário: a hora extra pode ser de
+               qualquer pessoa da equipe, e não poder escolhê-la trava o
+               lançamento sem explicar por quê. */
+            people={peopleAtivos}
             entries={db.entries}
             company={db.company}
             period={period}
