@@ -9,6 +9,7 @@ import { ProofSheet } from './components/ProofSheet'
 import { FotoSheet } from './components/FotoSheet'
 import { CalculoSheet } from './components/CalculoSheet'
 import { HoraExtraSheet } from './components/HoraExtraSheet'
+import { HorasPage } from './pages/HorasPage'
 import { Toast } from './components/Toast'
 import { DemoNotice } from './components/DemoNotice'
 import { EquipePage } from './pages/EquipePage'
@@ -637,7 +638,10 @@ export default function App() {
    * relatório por função, o recibo e o total do mês já sabem tratar extra, e
    * inventar um tipo paralelo faria a hora extra sumir de todos eles.
    */
-  function lancarHoraExtra(person: Person, r: { valor: number; descricao: string }) {
+  function lancarHoraExtra(
+    person: Person,
+    r: { valor: number; descricao: string; data?: string },
+  ) {
     registrar('Hora extra')
     const novo: Entry = {
       id: uid(),
@@ -645,7 +649,7 @@ export default function App() {
       period,
       kind: 'extra',
       amount: r.valor,
-      date: new Date().toISOString().slice(0, 10),
+      date: r.data ?? new Date().toISOString().slice(0, 10),
       paid: false,
       description: r.descricao,
       createdAt: new Date().toISOString(),
@@ -653,6 +657,21 @@ export default function App() {
     setDb((d) => ({ ...d, entries: [...d.entries, novo] }))
     setSheet(null)
     flash(`Hora extra de ${formatMoney(r.valor)} lançada.`)
+  }
+
+  /**
+   * Apaga um lançamento em aberto.
+   *
+   * Só o que ainda não foi pago: apagar um pagamento feito apagaria dinheiro
+   * que já saiu, e deixaria o recibo emitido apontando para um lançamento
+   * inexistente.
+   */
+  function excluirLancamento(id: string) {
+    const alvo = db.entries.find((e) => e.id === id)
+    if (!alvo || alvo.paid) return
+    registrar('Excluir lançamento')
+    setDb((d) => ({ ...d, entries: d.entries.filter((e) => e.id !== id) }))
+    flash('Lançamento excluído.')
   }
 
   function repetirMesAnterior() {
@@ -905,6 +924,18 @@ export default function App() {
             onVerFoto={(person) => setSheet({ mode: 'foto', person })}
             onVerCalculo={(person) => setSheet({ mode: 'calculo', person })}
             onAssinarDepois={assinarDepois}
+          />
+        ) : null}
+
+        {tab === 'horas' ? (
+          <HorasPage
+            people={peopleDoMes}
+            entries={db.entries}
+            company={db.company}
+            period={period}
+            onLancar={(person, r) => lancarHoraExtra(person, r)}
+            onExcluir={excluirLancamento}
+            onError={flash}
           />
         ) : null}
 

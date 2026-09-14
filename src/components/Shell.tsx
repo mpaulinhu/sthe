@@ -1,11 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ButterflyMark } from './Primitives'
 
-export type TabId = 'equipe' | 'pagamentos' | 'agenda' | 'relatorios' | 'config'
+export type TabId = 'equipe' | 'pagamentos' | 'horas' | 'agenda' | 'relatorios' | 'config'
 
 export const TABS: { id: TabId; label: string }[] = [
   { id: 'equipe', label: 'Equipe' },
   { id: 'pagamentos', label: 'Pagamentos' },
+  // Logo depois de Pagamentos: hora extra é dinheiro do mês, e é ali que se
+  // procura por ela — não junto de agenda ou relatórios.
+  { id: 'horas', label: 'Horas extras' },
   { id: 'agenda', label: 'Agenda' },
   { id: 'relatorios', label: 'Relatórios' },
   { id: 'config', label: 'Configurações' },
