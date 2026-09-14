@@ -26,6 +26,7 @@ import {
   buildGroups,
   buildRepeatedEntries,
   currentPeriod,
+  findProportionalMismatches,
   formatMoney,
   formatPeriod,
   monthStats,
@@ -190,6 +191,12 @@ export default function App() {
         ? buildRepeatedEntries(db.entries, shiftPeriod(period, -1), period, peopleAtivos, uid)
         : [],
     [mesVazio, db.entries, period, peopleAtivos],
+  )
+
+  /** Salários cheios em meses que deveriam ser proporcionais. */
+  const divergentes = useMemo(
+    () => findProportionalMismatches(db.people, db.entries, period),
+    [db.people, db.entries, period],
   )
 
   const contagemPorTipo = useMemo(() => {
@@ -565,6 +572,40 @@ export default function App() {
     flash(`${KIND_LABEL[r.kind]} de ${formatMoney(valor)} lançado.`)
   }
 
+  /**
+   * Acerta os salários cheios lançados em meses de entrada ou saída.
+   *
+   * O lançamento do mês é gerado uma vez e não se atualiza sozinho — quem
+   * preenche a data de admissão depois de abrir o mês fica com o valor cheio
+   * e nenhum aviso. Aqui a correção é explícita, a pedido, e só toca o que
+   * ainda não foi pago e está exatamente no valor cheio (ver
+   * `findProportionalMismatches`).
+   */
+  function ajustarProporcional() {
+    if (divergentes.length === 0) return
+    registrar('Ajuste proporcional')
+
+    const porId = new Map(divergentes.map((d) => [d.entry.id, d.esperado]))
+    setDb((d) => ({
+      ...d,
+      entries: d.entries.map((e) => {
+        const esperado = porId.get(e.id)
+        if (!esperado) return e
+        return {
+          ...e,
+          amount: esperado.valor,
+          description: `Proporcional · ${esperado.dias} de ${esperado.base} dias`,
+        }
+      }),
+    }))
+
+    flash(
+      divergentes.length === 1
+        ? `${divergentes[0].person.name.split(' ')[0]}: ${formatMoney(divergentes[0].esperado.valor)}.`
+        : `${divergentes.length} lançamentos ajustados.`,
+    )
+  }
+
   function repetirMesAnterior() {
     registrar('Repetir mês anterior')
     setDb((d) => ({ ...d, entries: [...d.entries, ...repetiveis] }))
@@ -797,6 +838,8 @@ export default function App() {
             onPagarSelecionados={pagarSelecionados}
             porForma={porForma}
             repetiveis={repetiveis}
+            divergentes={divergentes}
+            onAjustarProporcional={ajustarProporcional}
             onRepetir={repetirMesAnterior}
             discreet={discreet}
             val={val}

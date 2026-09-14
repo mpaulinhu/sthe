@@ -10,6 +10,7 @@ import {
 } from '../components/Shell'
 import { PersonRow } from '../components/PersonRow'
 import {
+  formatMoney,
   formatPeriod,
   formatShortDate,
   shiftPeriod,
@@ -18,6 +19,7 @@ import {
   type MethodSlice,
   type MonthStats,
   type PersonSummary,
+  type ProporcionalDivergente,
   type SortKey,
 } from '../lib/calc'
 import { payrollByRole } from '../lib/business'
@@ -64,6 +66,8 @@ export function PagamentosPage({
   onPagarSelecionados,
   porForma,
   repetiveis,
+  divergentes,
+  onAjustarProporcional,
   onRepetir,
   discreet,
   val,
@@ -99,6 +103,9 @@ export function PagamentosPage({
   onPagarSelecionados: () => void
   porForma: MethodSlice[]
   repetiveis: Entry[]
+  /** Salários cheios em meses que deveriam ser proporcionais. */
+  divergentes: ProporcionalDivergente[]
+  onAjustarProporcional: () => void
   onRepetir: () => void
   discreet: boolean
   val: (v: number) => string
@@ -267,6 +274,43 @@ export function PagamentosPage({
                 className="rounded-[11px] bg-butterfly-500 px-4 py-2 text-[13px] font-medium text-white transition-all duration-200 hover:-translate-y-px hover:bg-butterfly-600"
               >
                 Repetir
+              </button>
+            </div>
+          ) : null}
+
+          {/* Salário cheio lançado num mês que deveria ser proporcional.
+              Acontece quando a data de admissão é preenchida depois de o mês
+              já ter sido aberto: o lançamento é gerado uma vez e não se
+              atualiza sozinho — o que protege ajustes manuais, mas deixaria
+              este ficar defasado em silêncio. */}
+          {divergentes.length > 0 ? (
+            <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl border border-due/30 bg-due-soft px-5 py-4">
+              <p className="flex-1 text-[13.5px] leading-relaxed text-ink-soft">
+                {divergentes.length === 1 ? (
+                  <>
+                    <strong className="font-medium">
+                      {divergentes[0].person.name.split(' ')[0]}
+                    </strong>{' '}
+                    {divergentes[0].esperado.motivo === 'saida' ? 'sai' : 'entrou'} neste mês —
+                    trabalha {divergentes[0].esperado.dias} de {divergentes[0].esperado.base} dias,
+                    mas está lançado o valor cheio.{' '}
+                    <span className="text-ink-dim">
+                      O proporcional seria {formatMoney(divergentes[0].esperado.valor)}.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <strong className="font-medium">{divergentes.length} pessoas</strong> entram ou
+                    saem neste mês e estão com o valor cheio lançado.{' '}
+                    <span className="text-ink-dim">Dá para acertar tudo de uma vez.</span>
+                  </>
+                )}
+              </p>
+              <button
+                onClick={onAjustarProporcional}
+                className="rounded-[11px] bg-due px-4 py-2 text-[13px] font-medium text-white transition-all duration-200 hover:-translate-y-px hover:opacity-90"
+              >
+                Ajustar
               </button>
             </div>
           ) : null}

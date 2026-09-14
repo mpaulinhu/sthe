@@ -454,6 +454,58 @@ export function buildFixedSalaries(
     })
 }
 
+/**
+ * Lançamentos de salário que não batem com o proporcional do mês.
+ *
+ * O lançamento do mês é gerado uma vez e depois não é mais tocado — o que
+ * protege ajustes feitos à mão, mas deixa um buraco: quem preenche a data de
+ * admissão DEPOIS de abrir o mês fica com o salário cheio lançado e nenhum
+ * aviso de que ele está defasado.
+ *
+ * Esta função encontra esses casos para a tela poder oferecer a correção. Não
+ * corrige nada sozinha: o valor pode ter sido ajustado de propósito, e
+ * sobrescrever sem perguntar é exatamente o que a regra de "gera uma vez"
+ * existe para evitar.
+ */
+export interface ProporcionalDivergente {
+  entry: Entry
+  person: Person
+  esperado: Proporcional
+}
+
+export function findProportionalMismatches(
+  people: Person[],
+  entries: Entry[],
+  period: string,
+): ProporcionalDivergente[] {
+  const fora: ProporcionalDivergente[] = []
+
+  for (const person of people) {
+    const esperado = proportionalForPeriod(person, period)
+    if (!esperado) continue
+
+    const doMes = entries.filter(
+      (e) =>
+        e.personId === person.id &&
+        e.period === period &&
+        e.kind === defaultKindFor(person.contract) &&
+        // Já pago é história: mexer no valor de um pagamento que aconteceu
+        // reescreveria o passado, e o recibo emitido não acompanharia.
+        !e.paid,
+    )
+
+    for (const entry of doMes) {
+      // Só avisa quando o lançado é o salário cheio. Um valor diferente dos
+      // dois foi escolhido à mão, e insistir nele seria teimosia do app.
+      if (entry.amount !== person.baseAmount) continue
+      if (entry.amount === esperado.valor) continue
+      fora.push({ entry, person, esperado })
+    }
+  }
+
+  return fora
+}
+
 /** O dia `day` dentro do período, respeitando meses mais curtos (31 → 28/30). */
 function dayInPeriod(period: string, day: number): string {
   const [y, m] = period.split('-').map(Number)

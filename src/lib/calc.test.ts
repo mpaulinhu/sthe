@@ -15,6 +15,7 @@ import {
   resolveAdvanceDate,
   proportionalForPeriod,
   activeInPeriod,
+  findProportionalMismatches,
 } from './calc'
 import type { Entry, EntryKind, Person } from './types'
 
@@ -1007,5 +1008,47 @@ describe('lançamento automático respeita admissão e saída', () => {
     const [e] = buildFixedSalaries([], '2026-09', [ana], id)
     expect(e.amount).toBe(1000)
     expect(e.description).toBe('Proporcional · 10 de 30 dias')
+  })
+})
+
+describe('detecta salário cheio em mês proporcional', () => {
+  // PERIOD é 2026-08 (31 dias); admissão dia 12 => 20 de 30 dias.
+  const ana = () => person({ baseAmount: 3000, hiredAt: `${PERIOD}-12` })
+
+  it('acha o lançamento cheio no mês de entrada', () => {
+    // O caso real: a data de admissão foi preenchida depois de o mês já ter
+    // sido aberto, então o lançamento ficou com o valor cheio.
+    const r = findProportionalMismatches([ana()], [entry('salario', 3000, false)], PERIOD)
+    expect(r).toHaveLength(1)
+    expect(r[0].esperado.dias).toBe(20)
+    expect(r[0].esperado.valor).toBe(2000)
+  })
+
+  it('ignora quando já está proporcional', () => {
+    expect(
+      findProportionalMismatches([ana()], [entry('salario', 2000, false)], PERIOD),
+    ).toHaveLength(0)
+  })
+
+  it('não mexe no que já foi pago', () => {
+    // Reescrever o valor de um pagamento que aconteceu deixaria o recibo
+    // emitido apontando para outro número.
+    expect(
+      findProportionalMismatches([ana()], [entry('salario', 3000, true)], PERIOD),
+    ).toHaveLength(0)
+  })
+
+  it('não mexe em valor ajustado à mão', () => {
+    // 2500 não é nem o cheio nem o proporcional: foi escolhido de propósito.
+    expect(
+      findProportionalMismatches([ana()], [entry('salario', 2500, false)], PERIOD),
+    ).toHaveLength(0)
+  })
+
+  it('mês cheio não gera divergência', () => {
+    const veterana = person({ baseAmount: 3000, hiredAt: '2025-01-10' })
+    expect(
+      findProportionalMismatches([veterana], [entry('salario', 3000, false)], PERIOD),
+    ).toHaveLength(0)
   })
 })
