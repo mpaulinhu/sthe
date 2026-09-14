@@ -47,6 +47,20 @@ export interface PersonSummary {
   proximaData: string
   /** `true` quando `proximaData` é a do vale, para a lista poder rotular. */
   proximaEhVale: boolean
+  /**
+   * Quanto falta para fechar o vale, considerando o que já foi pago no mês.
+   *
+   * O que já saiu abate do vale primeiro: quem paga R$ 300 de um vale de
+   * R$ 800 ainda deve R$ 500 de vale, não R$ 800. Zero quando não há vale ou
+   * quando ele já foi coberto.
+   */
+  faltaVale: number
+  /**
+   * O valor que o campo de pagamento deve trazer pronto: o que falta do vale
+   * enquanto ele não fechou, o restante do mês depois disso. É a diferença
+   * entre digitar o número toda vez e só confirmar.
+   */
+  sugestaoPagamento: number
 }
 
 export interface MonthSummary {
@@ -178,6 +192,10 @@ export function summarizePerson(
   const dataPagamento = resolvePayDate(period, person, workDays)
   const dataVale = resolveAdvanceDate(period, person, workDays)
   const valorVale = advanceAmount(person)
+  // O que já foi pago no mês abate do vale primeiro: é a ordem em que o
+  // dinheiro sai na vida real, e sem isso um pagamento parcial deixaria o
+  // vale "inteiro em aberto" mesmo já tendo sido coberto.
+  const faltaVale = valorVale > 0 ? Math.max(0, Math.min(valorVale, total) - pago) : 0
   const hoje = todayIso()
   const mesAtual = hoje.slice(0, 7)
   let venceu: boolean
@@ -201,6 +219,11 @@ export function summarizePerson(
     // — atraso é assunto de `atrasado`, não da data que a lista mostra.
     proximaData: dataVale && hoje <= dataVale ? dataVale : dataPagamento,
     proximaEhVale: Boolean(dataVale) && hoje <= dataVale,
+    faltaVale,
+    // Enquanto o vale não fechou, é ele que o campo sugere — mesmo depois do
+    // dia dele ter passado: um vale atrasado continua sendo a próxima conta a
+    // acertar, e sugerir o mês inteiro aqui esconderia isso.
+    sugestaoPagamento: faltaVale > 0 ? Math.min(faltaVale, falta) : falta,
     quitado: total > 0 && falta === 0,
     atrasado,
     venceu,

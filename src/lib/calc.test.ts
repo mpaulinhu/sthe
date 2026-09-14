@@ -710,3 +710,60 @@ describe('vale (adiantamento)', () => {
     expect(data).toBe('2026-09-07')
   })
 })
+
+describe('pagamento em duas etapas (vale + restante)', () => {
+  // Ana ganha 2000 e tem vale de 40% = 800, todo dia 20.
+  const comVale = () => person({ advance: { day: 20, percent: 40 } })
+
+  it('sem nada pago, sugere o vale — não o mês inteiro', () => {
+    const s = summarizePerson(comVale(), [entry('salario', 2000, false)], PERIOD)
+    expect(s.valorVale).toBe(800)
+    expect(s.faltaVale).toBe(800)
+    expect(s.sugestaoPagamento).toBe(800)
+    expect(s.falta).toBe(2000)
+  })
+
+  it('com o vale pago, sugere o que sobrou', () => {
+    const s = summarizePerson(
+      comVale(),
+      [entry('salario', 2000, false), entry('vale', 800, true)],
+      PERIOD,
+    )
+    expect(s.faltaVale).toBe(0)
+    expect(s.sugestaoPagamento).toBe(s.falta)
+    expect(s.falta).toBe(1200)
+  })
+
+  it('pagamento parcial abate do vale primeiro', () => {
+    // Pagou 300 de um vale de 800: ainda deve 500 de vale, não 800.
+    const s = summarizePerson(
+      comVale(),
+      [entry('salario', 2000, false), entry('vale', 300, true)],
+      PERIOD,
+    )
+    expect(s.faltaVale).toBe(500)
+    expect(s.sugestaoPagamento).toBe(500)
+  })
+
+  it('quem não tem vale segue sugerindo o que falta', () => {
+    const s = summarizePerson(person(), [entry('salario', 2000, false)], PERIOD)
+    expect(s.valorVale).toBe(0)
+    expect(s.faltaVale).toBe(0)
+    expect(s.sugestaoPagamento).toBe(2000)
+  })
+
+  it('mês já quitado não sugere nada a pagar', () => {
+    const s = summarizePerson(comVale(), [entry('salario', 2000, true)], PERIOD)
+    expect(s.falta).toBe(0)
+    expect(s.faltaVale).toBe(0)
+    expect(s.sugestaoPagamento).toBe(0)
+  })
+
+  it('vale maior que o devido no mês não sugere mais do que se deve', () => {
+    // Mês curto: só 500 lançados, mas o vale calculado é 800. Sugerir 800
+    // faria pagar mais do que a pessoa tem a receber.
+    const s = summarizePerson(comVale(), [entry('servico', 500, false)], PERIOD)
+    expect(s.falta).toBe(500)
+    expect(s.sugestaoPagamento).toBe(500)
+  })
+})

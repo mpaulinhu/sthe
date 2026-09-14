@@ -56,13 +56,19 @@ export function ValueSheet({
 }) {
   const falta = numberToCents(summary.falta)
   const base = numberToCents(person.baseAmount)
+  // Quem tem vale recebe em duas etapas. O campo já vem com a etapa certa: o
+  // vale enquanto ele não fechou, o restante depois — assim ela confirma em vez
+  // de calcular de cabeça quanto ainda falta de cada parte.
+  const sugestao = numberToCents(summary.sugestaoPagamento)
+  const faltaVale = numberToCents(summary.faltaVale)
+  const pagandoVale = faltaVale > 0 && sugestao === faltaVale && faltaVale < falta
 
   const kindInicial = defaultKindFor(person.contract)
 
   // Ao lançar, já vem preenchido com o valor combinado no cadastro (salário
   // mensal, diária ou referência) — é para isso que aquele campo existe.
   // Ela só ajusta quando o mês foge do padrão, em vez de redigitar sempre.
-  const [cents, setCents] = useState(mode === 'pagar' ? falta : base)
+  const [cents, setCents] = useState(mode === 'pagar' ? sugestao : base)
   const [kind, setKind] = useState<EntryKind>(kindInicial)
   // A forma habitual da pessoa já vem escolhida — trocar aqui vale só para
   // este pagamento, sem mexer no cadastro dela.
@@ -110,8 +116,14 @@ export function ValueSheet({
 
   return (
     <Sheet
-      title={isPagar ? 'Registrar pagamento' : 'Lançar valor'}
-      subtitle={`${person.name}${summary.falta > 0 ? ` · falta ${formatMoney(summary.falta)}` : ''}`}
+      title={isPagar && pagandoVale ? 'Pagar o vale' : isPagar ? 'Registrar pagamento' : 'Lançar valor'}
+      subtitle={
+        // Dizer qual etapa está sendo paga evita a dúvida de olhar um valor
+        // menor que o do mês e não saber se faltou alguma coisa.
+        isPagar && pagandoVale
+          ? `${person.name} · vale de ${formatMoney(summary.valorVale)} · sobra ${formatMoney(summary.falta - summary.faltaVale)} para depois`
+          : `${person.name}${summary.falta > 0 ? ` · falta ${formatMoney(summary.falta)}` : ''}`
+      }
       onClose={onClose}
       footer={
         <>
@@ -188,7 +200,19 @@ export function ValueSheet({
         ) : null}
 
         {isPagar && falta > 0 ? (
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
+            {/* O vale vem primeiro quando ainda está em aberto: é a etapa que
+                ela está pagando agora, e deixá-lo depois de "Tudo" faria o
+                atalho mais provável ser o segundo da fila. */}
+            {faltaVale > 0 && faltaVale < falta ? (
+              <button
+                type="button"
+                onClick={() => setCents(faltaVale)}
+                className="rounded-[9px] border border-butterfly-200 bg-butterfly-50 px-[11px] py-[7px] text-[12.5px] font-medium text-butterfly-600 transition-colors hover:bg-butterfly-100"
+              >
+                Vale · {formatMoney(summary.faltaVale)}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setCents(falta)}
