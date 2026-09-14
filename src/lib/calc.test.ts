@@ -890,12 +890,13 @@ describe('proporcional de admissão e saída', () => {
     expect(proportionalForPeriod(p({ leftAt: '2026-02-28' }), '2026-02')).toBeNull()
   })
 
-  it('o divisor é sempre 30, mesmo em mês de 31 dias', () => {
-    // Admitida em 02/08 (31 dias): 30 dias trabalhados sobre base 30.
+  it('mês de 31 dias desconta o dia perdido, não paga cheio', () => {
+    // Admitida em 02/08 (31 dias): trabalha 30 dias corridos, mas perdeu um
+    // dia. Contar 30/30 pagaria o salário inteiro como se não tivesse perdido.
     const r = proportionalForPeriod(p({ hiredAt: '2026-08-02' }), '2026-08')!
-    expect(r.dias).toBe(30)
+    expect(r.dias).toBe(29)
     expect(r.base).toBe(30)
-    expect(r.valor).toBe(3000)
+    expect(r.valor).toBe(2900)
   })
 
   it('o último dia conta como trabalhado', () => {
@@ -915,9 +916,21 @@ describe('proporcional de admissão e saída', () => {
     expect(r.motivo).toBe('ambos')
   })
 
-  it('fevereiro: admitida dia 15 conta até o dia 28', () => {
+  it('fevereiro: admitida dia 15 conta metade do mês', () => {
+    // 14 dias corridos num mês de 28; sobre a base 30 isso vira 16, porque
+    // fevereiro "vale" 30 dias na folha — quem trabalha metade dele recebe
+    // mais que 14/30.
     const r = proportionalForPeriod(p({ hiredAt: '2026-02-15' }), '2026-02')!
-    expect(r.dias).toBe(14)
+    expect(r.dias).toBe(16)
+    expect(r.valor).toBe(1600)
+  })
+
+  it('a proporção é comparável entre meses de tamanhos diferentes', () => {
+    // Entrar no dia 15 é meio mês em qualquer calendário. Sem o ajuste de
+    // base, fevereiro pagaria 14/30 e março 17/30 pela mesma metade.
+    const fev = proportionalForPeriod(p({ hiredAt: '2026-02-15' }), '2026-02')!
+    const mar = proportionalForPeriod(p({ hiredAt: '2026-03-15' }), '2026-03')!
+    expect(Math.abs(fev.dias - mar.dias)).toBeLessThanOrEqual(1)
   })
 
   it('datas incoerentes não geram valor negativo', () => {
@@ -1020,8 +1033,23 @@ describe('detecta salário cheio em mês proporcional', () => {
     // sido aberto, então o lançamento ficou com o valor cheio.
     const r = findProportionalMismatches([ana()], [entry('salario', 3000, false)], PERIOD)
     expect(r).toHaveLength(1)
-    expect(r[0].esperado.dias).toBe(20)
-    expect(r[0].esperado.valor).toBe(2000)
+    // Agosto tem 31 dias: do dia 12 ao 31 são 20 corridos, 19 sobre a base 30.
+    expect(r[0].esperado.dias).toBe(19)
+    expect(r[0].esperado.valor).toBe(1900)
+  })
+
+  it('acha o proporcional defasado quando a data de admissão muda', () => {
+    // O caso real: admissão corrigida de 14 para 02, e o lançamento ficou com
+    // o valor da data antiga. Antes isso passava batido porque a detecção só
+    // olhava o salário cheio.
+    const antigo = { ...entry('salario', 1900, false), description: 'Proporcional · 19 de 30 dias' }
+    const r = findProportionalMismatches(
+      [person({ baseAmount: 3000, hiredAt: `${PERIOD}-02` })],
+      [antigo],
+      PERIOD,
+    )
+    expect(r).toHaveLength(1)
+    expect(r[0].esperado.dias).toBe(29)
   })
 
   it('ignora quando já está proporcional', () => {
@@ -1039,7 +1067,7 @@ describe('detecta salário cheio em mês proporcional', () => {
   })
 
   it('não mexe em valor ajustado à mão', () => {
-    // 2500 não é nem o cheio nem o proporcional: foi escolhido de propósito.
+    // 2500 não é o cheio nem tem a descrição do app: foi digitado de propósito.
     expect(
       findProportionalMismatches([ana()], [entry('salario', 2500, false)], PERIOD),
     ).toHaveLength(0)

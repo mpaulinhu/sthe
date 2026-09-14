@@ -292,10 +292,10 @@ export function PagamentosPage({
                       {divergentes[0].person.name.split(' ')[0]}
                     </strong>{' '}
                     {divergentes[0].esperado.motivo === 'saida' ? 'sai' : 'entrou'} neste mês —
-                    trabalha {divergentes[0].esperado.dias} de {divergentes[0].esperado.base} dias,
-                    mas está lançado o valor cheio.{' '}
+                    trabalha {divergentes[0].esperado.dias} de {divergentes[0].esperado.base} dias.{' '}
                     <span className="text-ink-dim">
-                      O proporcional seria {formatMoney(divergentes[0].esperado.valor)}.
+                      Está lançado {formatMoney(divergentes[0].entry.amount)}; o proporcional é{' '}
+                      {formatMoney(divergentes[0].esperado.valor)}.
                     </span>
                   </>
                 ) : (

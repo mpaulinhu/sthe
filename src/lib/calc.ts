@@ -495,10 +495,19 @@ export function findProportionalMismatches(
     )
 
     for (const entry of doMes) {
-      // Só avisa quando o lançado é o salário cheio. Um valor diferente dos
-      // dois foi escolhido à mão, e insistir nele seria teimosia do app.
-      if (entry.amount !== person.baseAmount) continue
       if (entry.amount === esperado.valor) continue
+
+      // Avisa em dois casos: o salário cheio (a data foi preenchida depois de
+      // o mês abrir) e um proporcional que não bate mais com as datas atuais
+      // — quem corrige a admissão de 14 para 02 fica com o valor da data
+      // antiga, e sem isto a mudança pareceria não ter surtido efeito.
+      //
+      // A marca de "foi o app que lançou" é a descrição: um valor digitado à
+      // mão não a tem, e sobrescrever escolha da pessoa seria teimosia.
+      const ehCheio = entry.amount === person.baseAmount
+      const ehProporcionalAntigo = entry.description.startsWith('Proporcional ·')
+      if (!ehCheio && !ehProporcionalAntigo) continue
+
       fora.push({ entry, person, esperado })
     }
   }
@@ -613,9 +622,7 @@ export function proportionalForPeriod(
   const saiu = person.leftAt?.slice(0, 7) === period
   if (!entrou && !saiu) return null
 
-  // Entrou no dia 1º e ficou até o fim: trabalhou o mês inteiro, então recebe
-  // o salário cheio. Sem esta saída, um mês de 31 dias pagaria 31/30 — mais
-  // que o combinado — e quem entrou no primeiro dia útil estranharia com razão.
+  // Entrou no dia 1º e ficou até o fim: trabalhou o mês inteiro, recebe cheio.
   const entrouNoPrimeiro = !entrou || person.hiredAt!.slice(8, 10) === '01'
   const saiuNoUltimo = !saiu || Number(person.leftAt!.slice(8, 10)) >= ultimoDiaDoMes
   if (entrouNoPrimeiro && saiuNoUltimo) return null
@@ -625,9 +632,17 @@ export function proportionalForPeriod(
   const ultimo = saiu ? Number(person.leftAt!.slice(8, 10)) : ultimoDiaDoMes
 
   // Datas incoerentes (saída antes da entrada) não geram valor negativo.
-  const dias = Math.max(0, Math.min(ultimo, ultimoDiaDoMes) - primeiro + 1)
+  const corridos = Math.max(0, Math.min(ultimo, ultimoDiaDoMes) - primeiro + 1)
 
   const base = 30
+
+  // Os dias contados são sobre a base 30, não sobre o calendário. Num mês de
+  // 31 dias, quem entra no dia 2 trabalha 30 dias corridos — mas perdeu um dia
+  // de trabalho, e 30/30 pagaria o salário cheio como se não tivesse perdido.
+  // Descontar os dias faltantes da base é o que mantém a proporção honesta em
+  // meses de 28, 30 e 31 dias.
+  const faltaram = ultimoDiaDoMes - corridos
+  const dias = Math.max(0, base - faltaram)
   const valor = Math.round((person.baseAmount / base) * dias * 100) / 100
 
   return {
