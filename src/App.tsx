@@ -7,6 +7,7 @@ import { SignSheet, type SignResult } from './components/SignSheet'
 import { ReceiptSheet } from './components/ReceiptSheet'
 import { ProofSheet } from './components/ProofSheet'
 import { FotoSheet } from './components/FotoSheet'
+import { CalculoSheet } from './components/CalculoSheet'
 import { Toast } from './components/Toast'
 import { DemoNotice } from './components/DemoNotice'
 import { EquipePage } from './pages/EquipePage'
@@ -28,6 +29,7 @@ import {
   currentPeriod,
   findProportionalMismatches,
   formatMoney,
+  proportionalForPeriod,
   recalcEntriesForPerson,
   formatPeriod,
   monthStats,
@@ -76,6 +78,7 @@ type SheetState =
   | { mode: 'recibo'; recibo: Receipt }
   | { mode: 'comprovante'; entry: Entry }
   | { mode: 'foto'; person: Person }
+  | { mode: 'calculo'; person: Person }
   | null
 
 export default function App() {
@@ -192,6 +195,12 @@ export default function App() {
         ? buildRepeatedEntries(db.entries, shiftPeriod(period, -1), period, peopleAtivos, uid)
         : [],
     [mesVazio, db.entries, period, peopleAtivos],
+  )
+
+  /** A conta do proporcional da pessoa aberta no sheet de cálculo. */
+  const proporcionalDoSheet = useMemo(
+    () => (sheet?.mode === 'calculo' ? proportionalForPeriod(sheet.person, period) : null),
+    [sheet, period],
   )
 
   /** Salários cheios em meses que deveriam ser proporcionais. */
@@ -866,6 +875,7 @@ export default function App() {
             onVerRecibo={(recibo) => setSheet({ mode: 'recibo', recibo })}
             onVerComprovante={(entry) => setSheet({ mode: 'comprovante', entry })}
             onVerFoto={(person) => setSheet({ mode: 'foto', person })}
+            onVerCalculo={(person) => setSheet({ mode: 'calculo', person })}
             onAssinarDepois={assinarDepois}
           />
         ) : null}
@@ -1028,6 +1038,17 @@ export default function App() {
 
       {sheet?.mode === 'foto' ? (
         <FotoSheet person={sheet.person} onClose={() => setSheet(null)} />
+      ) : null}
+
+      {/* A conta do proporcional. O sheet só é montado quando há proporcional
+          de verdade — o selo que o abre já depende disso. */}
+      {sheet?.mode === 'calculo' && proporcionalDoSheet ? (
+        <CalculoSheet
+          person={sheet.person}
+          proporcional={proporcionalDoSheet}
+          period={period}
+          onClose={() => setSheet(null)}
+        />
       ) : null}
 
       <Toast message={toast} onDone={() => setToast('')} />

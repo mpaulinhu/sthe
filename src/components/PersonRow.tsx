@@ -1,4 +1,10 @@
-import { formatMoney, formatShortDate, monthAbbr, type PersonSummary } from '../lib/calc'
+import {
+  formatMoney,
+  formatShortDate,
+  monthAbbr,
+  proportionalForPeriod,
+  type PersonSummary,
+} from '../lib/calc'
 import {
   CONTRACT_AVATAR,
   CONTRACT_LABEL,
@@ -34,6 +40,7 @@ export function PersonRow({
   onVerRecibo,
   onVerComprovante,
   onVerFoto,
+  onVerCalculo,
   onAssinarDepois,
 }: {
   summary: PersonSummary
@@ -55,6 +62,8 @@ export function PersonRow({
   onVerRecibo?: (r: Receipt) => void
   onVerComprovante?: (entry: Entry) => void
   onVerFoto?: (p: Person) => void
+  /** Abre a explicação do proporcional. Sem ela, o selo não aparece. */
+  onVerCalculo?: () => void
   /** Reconhecer o recebimento depois de já ter marcado como pago sem assinar na hora. */
   onAssinarDepois?: (entry: Entry) => void
 }) {
@@ -68,6 +77,10 @@ export function PersonRow({
   const desc = (t: string) => (discreet ? t.replace(/R\$\s?[\d.,]+/g, '••••') : t)
 
   const semLancamento = total === 0 && entries.length === 0
+
+  // Mês de entrada ou saída tem valor proporcional; mês cheio devolve null e
+  // o selo não aparece.
+  const proporcional = proportionalForPeriod(person, period)
   // Sem lançamento não há dívida — mas se o dia de pagar já passou, isso
   // costuma ser esquecimento, e precisa chamar atenção em vez de parecer
   // "a pagar" (que sugere, falsamente, que já existe um valor combinado).
@@ -203,6 +216,26 @@ export function PersonRow({
               <span className="text-blush-500"> · {person.method}</span>
             ) : null}
           </p>
+
+          {/* Mês de entrada ou saída: o valor não é o salário cheio, e um
+              número quebrado sem explicação parece erro. O selo abre a conta.
+              Só existe quando há proporcional — mês cheio não tem o que
+              explicar. */}
+          {proporcional && onVerCalculo ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onVerCalculo()
+              }}
+              className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-butterfly-200 bg-butterfly-50 py-[3px] pl-2 pr-2.5 text-[11.5px] font-medium text-butterfly-600 transition-colors hover:bg-butterfly-100"
+            >
+              <svg viewBox="0 0 14 14" className="h-[11px] w-[11px]" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+                <circle cx="7" cy="7" r="5.5" />
+                <path d="M7 6.2v4M7 4.1v.6" strokeLinecap="round" />
+              </svg>
+              {proporcional.dias} de {proporcional.base} dias · ver conta
+            </button>
+          ) : null}
         </div>
 
         {/* No mobile o valor e as ações dividem a segunda linha inteira (valor
