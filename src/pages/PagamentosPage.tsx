@@ -77,6 +77,7 @@ export function PagamentosPage({
   onIrParaEquipe,
   onPagar,
   onLancar,
+  onHoraExtra,
   onEditar,
   onToggleEntry,
   onVerRecibo,
@@ -116,6 +117,7 @@ export function PagamentosPage({
   onIrParaEquipe: () => void
   onPagar: (p: Person) => void
   onLancar: (p: Person) => void
+  onHoraExtra: (p: Person) => void
   onEditar: (p: Person) => void
   onToggleEntry: (e: Entry) => void
   onVerRecibo: (r: Receipt) => void
@@ -518,6 +520,7 @@ export function PagamentosPage({
                           }
                           onPagar={() => onPagar(s.person)}
                           onLancar={() => onLancar(s.person)}
+                          onHoraExtra={() => onHoraExtra(s.person)}
                           onEditar={() => onEditar(s.person)}
                           onToggleEntry={onToggleEntry}
                           recibos={db.recibos.filter(

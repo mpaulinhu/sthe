@@ -8,6 +8,7 @@ import { ReceiptSheet } from './components/ReceiptSheet'
 import { ProofSheet } from './components/ProofSheet'
 import { FotoSheet } from './components/FotoSheet'
 import { CalculoSheet } from './components/CalculoSheet'
+import { HoraExtraSheet } from './components/HoraExtraSheet'
 import { Toast } from './components/Toast'
 import { DemoNotice } from './components/DemoNotice'
 import { EquipePage } from './pages/EquipePage'
@@ -79,6 +80,7 @@ type SheetState =
   | { mode: 'comprovante'; entry: Entry }
   | { mode: 'foto'; person: Person }
   | { mode: 'calculo'; person: Person }
+  | { mode: 'horaExtra'; person: Person }
   | null
 
 export default function App() {
@@ -628,6 +630,31 @@ export default function App() {
     )
   }
 
+  /**
+   * Lança a hora extra já calculada pelo sheet.
+   *
+   * Entra como `extra` (o tipo que já existia) e não como um tipo novo: o
+   * relatório por função, o recibo e o total do mês já sabem tratar extra, e
+   * inventar um tipo paralelo faria a hora extra sumir de todos eles.
+   */
+  function lancarHoraExtra(person: Person, r: { valor: number; descricao: string }) {
+    registrar('Hora extra')
+    const novo: Entry = {
+      id: uid(),
+      personId: person.id,
+      period,
+      kind: 'extra',
+      amount: r.valor,
+      date: new Date().toISOString().slice(0, 10),
+      paid: false,
+      description: r.descricao,
+      createdAt: new Date().toISOString(),
+    }
+    setDb((d) => ({ ...d, entries: [...d.entries, novo] }))
+    setSheet(null)
+    flash(`Hora extra de ${formatMoney(r.valor)} lançada.`)
+  }
+
   function repetirMesAnterior() {
     registrar('Repetir mês anterior')
     setDb((d) => ({ ...d, entries: [...d.entries, ...repetiveis] }))
@@ -870,6 +897,7 @@ export default function App() {
             onIrParaEquipe={() => setTab('equipe')}
             onPagar={(p) => setSheet({ mode: 'pagar', person: p })}
             onLancar={(p) => setSheet({ mode: 'lancar', person: p })}
+            onHoraExtra={(p) => setSheet({ mode: 'horaExtra', person: p })}
             onEditar={(p) => setSheet({ mode: 'pessoa', person: p })}
             onToggleEntry={toggleEntry}
             onVerRecibo={(recibo) => setSheet({ mode: 'recibo', recibo })}
@@ -1038,6 +1066,16 @@ export default function App() {
 
       {sheet?.mode === 'foto' ? (
         <FotoSheet person={sheet.person} onClose={() => setSheet(null)} />
+      ) : null}
+
+      {sheet?.mode === 'horaExtra' ? (
+        <HoraExtraSheet
+          person={sheet.person}
+          company={db.company}
+          onConfirm={(r) => lancarHoraExtra(sheet.person, r)}
+          onClose={() => setSheet(null)}
+          onError={flash}
+        />
       ) : null}
 
       {/* A conta do proporcional. O sheet só é montado quando há proporcional

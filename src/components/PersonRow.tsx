@@ -35,6 +35,7 @@ export function PersonRow({
   onToggle,
   onPagar,
   onLancar,
+  onHoraExtra,
   onEditar,
   onToggleEntry,
   onVerRecibo,
@@ -57,6 +58,7 @@ export function PersonRow({
   onToggle: () => void
   onPagar: () => void
   onLancar: () => void
+  onHoraExtra?: () => void
   onEditar: () => void
   onToggleEntry: (entry: Entry) => void
   onVerRecibo?: (r: Receipt) => void
@@ -502,6 +504,16 @@ export function PersonRow({
             >
               Lançar valor
             </button>
+            {/* Hora extra tem tela própria porque o que se digita é tempo e
+                percentual, não dinheiro — o valor é consequência. */}
+            {onHoraExtra ? (
+              <button
+                onClick={onHoraExtra}
+                className="rounded-[9px] px-[11px] py-[7px] text-[13px] text-ink-faint transition-colors hover:bg-cream-deep hover:text-ink-soft"
+              >
+                Hora extra
+              </button>
+            ) : null}
             <button
               onClick={onEditar}
               className="rounded-[9px] px-[11px] py-[7px] text-[13px] text-ink-faint transition-colors hover:bg-cream-deep hover:text-ink-soft"

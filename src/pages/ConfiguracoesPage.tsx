@@ -3,7 +3,7 @@ import { PageHeader, Panel } from '../components/Shell'
 import { AcessosPanel } from '../components/AcessosPanel'
 import { Label, Segmented, fieldClass } from '../components/Sheet'
 import { isValidDoc, maskDoc, onlyDigits } from '../lib/receipt'
-import type { Company } from '../lib/types'
+import { DEFAULT_MONTHLY_HOURS, type Company } from '../lib/types'
 import type { Tema } from '../lib/theme'
 
 const DOC_LABEL = { cnpj: 'CNPJ', cpf: 'CPF' } as const
@@ -50,6 +50,22 @@ export function ConfiguracoesPage({
   const [doc, setDoc] = useState(company.doc ? maskDoc(company.doc, company.docType) : '')
   const [tradeName, setTradeName] = useState(company.tradeName)
   const [address, setAddress] = useState(company.address)
+  const [horasMes, setHorasMes] = useState(String(company.monthlyHours ?? DEFAULT_MONTHLY_HOURS))
+
+  /**
+   * Salva ao sair do campo, não a cada tecla: digitar "220" passaria por "2"
+   * e "22", e salvar esses valores intermediários faria a hora extra valer
+   * cem vezes mais por um instante.
+   */
+  function salvarHoras() {
+    const n = Number(horasMes)
+    if (!n || n < 1) {
+      setHorasMes(String(company.monthlyHours ?? DEFAULT_MONTHLY_HOURS))
+      return onError('As horas do mês precisam ser um número maior que zero.')
+    }
+    if (n === company.monthlyHours) return
+    onSave({ ...company, monthlyHours: n })
+  }
 
   const docLimpo = onlyDigits(doc)
   const tamanhoCerto = docLimpo.length === (docType === 'cnpj' ? 14 : 11)
@@ -264,6 +280,32 @@ export function ConfiguracoesPage({
           <p className="mt-3 text-[12px] text-ink-dim">
             Muda na hora — sem precisar salvar.
           </p>
+
+          {/* O divisor da hora extra. Fica aqui, junto dos dias de trabalho,
+              porque as duas coisas descrevem a mesma jornada. */}
+          <div className="mt-5 border-t border-cream-deep pt-4">
+            <Label>Horas de trabalho no mês</Label>
+            <div className="mt-2 flex items-center gap-3">
+              <div className="w-[100px]">
+                <input
+                  value={horasMes}
+                  onChange={(e) => setHorasMes(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                  onBlur={salvarHoras}
+                  inputMode="numeric"
+                  placeholder="220"
+                  aria-label="Horas de trabalho no mês"
+                  className={`${fieldClass} text-[15px] tabular-nums`}
+                />
+              </div>
+              <span className="text-[12.5px] leading-snug text-ink-faint">
+                horas · divide o salário para achar o valor da hora extra
+              </span>
+            </div>
+            <p className="mt-2 text-[12px] leading-snug text-ink-dim">
+              220 é a jornada de 44h por semana (segunda a sábado); 200 é a de 40h (segunda a
+              sexta). É o número que aparece no holerite.
+            </p>
+          </div>
         </Panel>
       </div>
 

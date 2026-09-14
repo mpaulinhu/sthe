@@ -193,10 +193,26 @@ export interface Company {
    * pagamento use esse modo, sem cada uma ter seu próprio calendário.
    */
   workDays: number[]
+  /**
+   * Horas de trabalho no mês — o divisor que transforma salário em valor da
+   * hora. Ausente usa o padrão de 220h.
+   *
+   * É da empresa e não de cada pessoa porque a jornada é a mesma para a
+   * equipe: quem trabalha meio período tem salário proporcional, não divisor
+   * diferente.
+   */
+  monthlyHours?: number
 }
 
 /** Segunda a sexta — o padrão mais comum, ajustável em Configurações. */
 export const DEFAULT_WORK_DAYS = [1, 2, 3, 4, 5]
+
+/**
+ * 220 horas/mês: a jornada de 44h semanais da CLT (8h de segunda a sexta mais
+ * 4h no sábado), que é o divisor que aparece em holerite e o que um contador
+ * espera ver. Quem trabalha 40h semanais usa 200 — ajustável em Configurações.
+ */
+export const DEFAULT_MONTHLY_HOURS = 220
 
 export const EMPTY_COMPANY: Company = {
   name: '',
@@ -205,6 +221,7 @@ export const EMPTY_COMPANY: Company = {
   tradeName: '',
   address: '',
   workDays: DEFAULT_WORK_DAYS,
+  monthlyHours: DEFAULT_MONTHLY_HOURS,
 }
 
 export interface Database {
