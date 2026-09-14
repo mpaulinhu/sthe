@@ -400,7 +400,10 @@ export default function App() {
               ? {
                   ...e,
                   paid: true,
-                  date: r.date,
+                  // Hora extra guarda o dia em que o trabalho aconteceu, e é
+                  // isso que o recibo discrimina. Sobrescrever com a data do
+                  // pagamento apagaria justamente o que ela comprova.
+                  date: e.kind === 'extra' ? e.date : r.date,
                   method: r.method,
                   receiptName: r.receiptName || e.receiptName,
                   receiptImage: r.receiptImage || e.receiptImage,
@@ -562,7 +565,9 @@ export default function App() {
           ? {
               ...e,
               paid: true,
-              date: hoje,
+              // Ver nota em `registrarPagamento`: a data da hora extra é a do
+              // trabalho, não a do pagamento.
+              date: e.kind === 'extra' ? e.date : hoje,
               method: d.people.find((p) => p.id === e.personId)?.method ?? e.method,
             }
           : e,
@@ -643,20 +648,38 @@ export default function App() {
     r: { valor: number; descricao: string; data?: string },
   ) {
     registrar('Hora extra')
+    const data = r.data ?? new Date().toISOString().slice(0, 10)
+
+    // O mês do lançamento sai da DATA em que a hora foi trabalhada, não da aba
+    // aberta — lançar uma hora de outubro estando em setembro colocaria o
+    // dinheiro no mês errado.
+    //
+    // E segue a mesma regra do salário: mês vencido, então o trabalho de
+    // outubro é pago em novembro. A hora extra sai no mesmo pagamento que o
+    // salário que ela acompanha.
+    const periodoDePagamento = shiftPeriod(data.slice(0, 7), 1)
+
     const novo: Entry = {
       id: uid(),
       personId: person.id,
-      period,
+      period: periodoDePagamento,
       kind: 'extra',
       amount: r.valor,
-      date: r.data ?? new Date().toISOString().slice(0, 10),
+      date: data,
       paid: false,
       description: r.descricao,
       createdAt: new Date().toISOString(),
     }
     setDb((d) => ({ ...d, entries: [...d.entries, novo] }))
     setSheet(null)
-    flash(`Hora extra de ${formatMoney(r.valor)} lançada.`)
+
+    // Diz em que mês ela caiu: sem isso, lançar algo que some da tela atual
+    // parece que não funcionou.
+    flash(
+      periodoDePagamento === period
+        ? `Hora extra de ${formatMoney(r.valor)} lançada.`
+        : `Hora extra de ${formatMoney(r.valor)} lançada em ${formatPeriod(periodoDePagamento).toLowerCase()}.`,
+    )
   }
 
   /**
@@ -1068,6 +1091,12 @@ export default function App() {
           company={db.company}
           quita={sheet.quita}
           saldoRestante={sheet.saldoRestante}
+          /* Só as horas extras que ESTE pagamento cobre: num vale, que quita
+             parte do mês, listar as do mês inteiro descreveria um pagamento
+             que não aconteceu. */
+          horasExtras={db.entries.filter(
+            (e) => e.kind === 'extra' && sheet.entryIds.includes(e.id),
+          )}
           onIrParaConfig={() => {
             setSheet(null)
             setTab('config')

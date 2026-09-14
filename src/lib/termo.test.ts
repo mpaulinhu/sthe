@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { montarTermo } from '../components/SignSheet'
-import type { Company } from './types'
+import type { Company, Entry } from './types'
 import type { Proporcional } from './calc'
 
 /**
@@ -26,7 +26,17 @@ const prop = (over: Partial<Proporcional> = {}): Proporcional => ({
   ...over,
 })
 
-function termo(valor: number, quita: boolean, saldo: number, p?: Proporcional | null) {
+const extra = (amount: number, description: string, date = '2026-10-20') =>
+  ({ id: `e${amount}`, personId: 'p1', period: '2026-11', kind: 'extra', amount,
+     date, paid: false, description, createdAt: '' }) as Entry
+
+function termo(
+  valor: number,
+  quita: boolean,
+  saldo: number,
+  p?: Proporcional | null,
+  extras?: Entry[],
+) {
   // `formatMoney` usa espaço não-quebrável entre "R$" e o número (é o que o
   // Intl produz em pt-BR). Normalizar aqui deixa os testes legíveis sem
   // esconder o formato real.
@@ -40,6 +50,7 @@ function termo(valor: number, quita: boolean, saldo: number, p?: Proporcional | 
     quita,
     saldo,
     p,
+    extras,
   ).replace(/ /g, ' ')
 }
 
@@ -119,5 +130,42 @@ describe('montarTermo — validade da assinatura eletrônica', () => {
     const t = termo(2000, true, 0)
     expect(t).toContain('de meu próprio punho')
     expect(t).toContain('livre e consciente')
+  })
+})
+
+describe('montarTermo — horas extras', () => {
+  it('discrimina as horas extras pagas', () => {
+    // Um recibo que soma tudo num valor só não permite conferir depois
+    // quantas horas foram pagas e a que percentual.
+    const t = termo(2030, true, 0, null, [extra(30, '2h a 100%')])
+    expect(t).toContain('R$ 30,00')
+    expect(t).toContain('2h a 100%')
+    expect(t).toContain('20/10/2026')
+  })
+
+  it('soma quando há mais de uma', () => {
+    const t = termo(2050, true, 0, null, [
+      extra(30, '2h a 100%', '2026-10-20'),
+      extra(20, '1h a 100%', '2026-10-25'),
+    ])
+    expect(t).toContain('R$ 50,00')
+    expect(t).toContain('cinquenta reais')
+    expect(t).toContain('2h a 100%')
+    expect(t).toContain('1h a 100%')
+  })
+
+  it('sem horas extras, não menciona nada', () => {
+    const t = termo(2000, true, 0)
+    expect(t).not.toContain('horas extras')
+  })
+
+  it('lista vazia também não menciona', () => {
+    expect(termo(2000, true, 0, null, [])).not.toContain('horas extras')
+  })
+
+  it('convive com o proporcional sem atropelar', () => {
+    const t = termo(1096, true, 0, prop(), [extra(30, '2h a 100%')])
+    expect(t).toContain('16 (dezesseis) dias')
+    expect(t).toContain('2h a 100%')
   })
 })

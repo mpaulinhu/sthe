@@ -15,7 +15,7 @@ import {
   onlyDigits,
   valorPorExtenso,
 } from '../lib/receipt'
-import type { Company, PaymentMethod, Person } from '../lib/types'
+import type { Company, Entry, PaymentMethod, Person } from '../lib/types'
 
 export interface SignResult {
   signature: string
@@ -34,6 +34,11 @@ export interface SignResult {
  * que se refere, e declara a quitação daquele valor — a mesma estrutura de um
  * recibo de papel, que é o que um juiz espera reconhecer.
  */
+/** "2026-10-20" → "20/10/2026". O termo não usa formato abreviado. */
+function formatarData(iso: string): string {
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`
+}
+
 export function montarTermo(
   nome: string,
   doc: string,
@@ -44,6 +49,7 @@ export function montarTermo(
   quita: boolean,
   saldoRestante: number,
   proporcional?: Proporcional | null,
+  horasExtras?: Entry[],
 ): string {
   // Quem pagou entra no termo por nome e documento. Um recibo que não diz de
   // quem o dinheiro veio prova pouco — e é justamente essa parte que estava
@@ -78,11 +84,23 @@ export function montarTermo(
       } no curso do período.`
     : ''
 
+  // Horas extras discriminadas. Um recibo que soma tudo num valor só não
+  // permite conferir depois quantas horas foram pagas e a que percentual —
+  // e é exatamente isso que se questiona numa divergência sobre jornada.
+  const extras = (horasExtras ?? []).filter((e) => e.amount > 0)
+  const totalExtras = extras.reduce((acc, e) => acc + e.amount, 0)
+  const detalheExtras = extras.length
+    ? ` Do valor acima, ${formatMoney(totalExtras)} (${valorPorExtenso(totalExtras)}) ` +
+      `referem-se a horas extras: ${extras
+        .map((e) => `${e.description || 'hora extra'} em ${formatarData(e.date)}`)
+        .join('; ')}.`
+    : ''
+
   return (
     `Eu, ${nome}, inscrita(o) no CPF nº ${maskCpf(doc)}, DECLARO ter recebido ` +
     `${de}a quantia de ${formatMoney(valor)} (${valorPorExtenso(valor)}), ` +
     `por meio de ${method}, referente aos serviços prestados no período de ` +
-    `${formatPeriod(period)}, ${quitacao}.${proporcionalidade} ` +
+    `${formatPeriod(period)}, ${quitacao}.${proporcionalidade}${detalheExtras} ` +
     `Confirmo que a assinatura abaixo é de meu próprio punho e que assino ` +
     `eletronicamente, de forma livre e consciente, nos termos da Lei nº 14.063/2020.`
   )
@@ -102,6 +120,7 @@ export function SignSheet({
   company,
   quita,
   saldoRestante,
+  horasExtras,
   onConfirm,
   onClose,
   onError,
@@ -116,6 +135,8 @@ export function SignSheet({
   quita: boolean
   /** Quanto ainda falta depois deste pagamento — só relevante quando parcial. */
   saldoRestante: number
+  /** Horas extras cobertas por este pagamento, para o termo poder discriminá-las. */
+  horasExtras?: Entry[]
   onConfirm: (r: SignResult) => void
   onClose: () => void
   onError: (msg: string) => void
@@ -158,9 +179,22 @@ export function SignSheet({
             quita,
             saldoRestante,
             proporcional,
+            horasExtras,
           )
         : '',
-    [person.name, docLimpo, docOk, valor, method, period, company, quita, saldoRestante, proporcional],
+    [
+      person.name,
+      docLimpo,
+      docOk,
+      valor,
+      method,
+      period,
+      company,
+      quita,
+      saldoRestante,
+      proporcional,
+      horasExtras,
+    ],
   )
 
   const pronto = docOk && leu && signature !== ''
