@@ -767,3 +767,44 @@ describe('pagamento em duas etapas (vale + restante)', () => {
     expect(s.sugestaoPagamento).toBe(500)
   })
 })
+
+describe('a data em destaque explica o status', () => {
+  // PERIOD é 2026-08, um mês no passado — então tudo nele já venceu.
+  it('em atraso, o destaque é o salário — nunca o vale futuro', () => {
+    // O bug que isso trava: a linha mostrava "20 · VALE" em vermelho quando o
+    // atrasado era o salário. Uma data que ainda não chegou não pode aparecer
+    // colada num alerta de atraso.
+    const s = summarizePerson(
+      person({ payDay: 5, advance: { day: 20, percent: 40 } }),
+      [entry('salario', 2000, false)],
+      PERIOD,
+    )
+    expect(s.atrasado).toBe(true)
+    expect(s.proximaEhVale).toBe(false)
+    expect(s.proximaData).toBe(s.dataPagamento)
+  })
+
+  it('sem atraso, o vale assume o destaque quando é o que vem primeiro', () => {
+    // Período futuro: nada venceu, então o vale (dia 20) é a próxima conta.
+    const s = summarizePerson(
+      person({ payDay: 28, advance: { day: 20, percent: 40 } }),
+      [{ ...entry('salario', 2000, false), period: '2099-01' }],
+      '2099-01',
+    )
+    expect(s.atrasado).toBe(false)
+    expect(s.proximaEhVale).toBe(true)
+    expect(s.proximaData).toBe(s.dataVale)
+  })
+
+  it('o vale segue visível como informação mesmo com o salário em atraso', () => {
+    // `faltaVale` é o que a linha usa para mostrar "vale dia 20 · R$ X" ao
+    // lado do nome: some do destaque, mas não da tela.
+    const s = summarizePerson(
+      person({ payDay: 5, advance: { day: 20, percent: 40 } }),
+      [entry('salario', 2000, false)],
+      PERIOD,
+    )
+    expect(s.faltaVale).toBe(800)
+    expect(s.dataVale).toBe(`${PERIOD}-20`)
+  })
+})

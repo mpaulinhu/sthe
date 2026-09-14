@@ -187,10 +187,15 @@ export function PersonRow({
             <span className={CONTRACT_TEXT[person.contract] || undefined}>
               {CONTRACT_LABEL[person.contract]}
             </span>
-            {/* Quanto sai no vale, só quando ele é a próxima data — fora
-                disso é ruído sobre um pagamento que já passou. */}
-            {summary.proximaEhVale ? (
-              <span className="text-butterfly-500"> · vale {formatMoney(summary.valorVale)}</span>
+            {/* O vale como informação secundária: aparece com o DIA dele
+                sempre que ainda há vale a pagar, inclusive quando o destaque
+                ao lado do nome está mostrando o salário atrasado. É o que
+                deixa as duas datas visíveis sem uma fingir ser a outra. */}
+            {summary.faltaVale > 0 ? (
+              <span className="text-butterfly-500">
+                {' · '}vale dia {Number(summary.dataVale.slice(8, 10))} ·{' '}
+                {formatMoney(summary.faltaVale)}
+              </span>
             ) : null}
             {/* A forma aparece só enquanto há o que pagar: depois de quitado
                 ela vira ruído, e o detalhe já mostra como cada parte saiu. */}

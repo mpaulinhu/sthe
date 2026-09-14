@@ -217,8 +217,12 @@ export function summarizePerson(
     // O vale só é "a próxima" enquanto ainda não chegou o dia dele. Depois
     // disso o que interessa é o salário, mesmo que o vale não tenha sido pago
     // — atraso é assunto de `atrasado`, não da data que a lista mostra.
-    proximaData: dataVale && hoje <= dataVale ? dataVale : dataPagamento,
-    proximaEhVale: Boolean(dataVale) && hoje <= dataVale,
+    // A data que a linha mostra em destaque precisa explicar o status ao lado
+    // dela. Quando há atraso, é sempre a do salário — mostrar o vale (futuro)
+    // colado num alerta vermelho faz parecer que o vale é que está atrasado,
+    // mesmo quando o dia dele nem chegou.
+    proximaData: !atrasado && dataVale && hoje <= dataVale ? dataVale : dataPagamento,
+    proximaEhVale: !atrasado && Boolean(dataVale) && hoje <= dataVale,
     faltaVale,
     // Enquanto o vale não fechou, é ele que o campo sugere — mesmo depois do
     // dia dele ter passado: um vale atrasado continua sendo a próxima conta a
