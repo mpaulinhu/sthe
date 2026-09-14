@@ -205,6 +205,19 @@ export function summarizePerson(
 
   const atrasado = falta > 0 && venceu
 
+  /** Qual das duas datas a linha destaca — ver nota no retorno. */
+  const proxima = (() => {
+    const semVale = { data: dataPagamento, ehVale: false }
+    if (atrasado || !dataVale || faltaVale <= 0) return semVale
+
+    // Fora do mês corrente não há "hoje" que sirva de corte: no mês passado
+    // tudo já venceu, no futuro nada venceu. Nos dois casos o que importa é
+    // só qual das duas cai antes.
+    const valeAindaVem = period === mesAtual ? hoje <= dataVale : true
+    if (!valeAindaVem) return semVale
+    return dataVale <= dataPagamento ? { data: dataVale, ehVale: true } : semVale
+  })()
+
   return {
     person,
     entries,
@@ -217,12 +230,18 @@ export function summarizePerson(
     // O vale só é "a próxima" enquanto ainda não chegou o dia dele. Depois
     // disso o que interessa é o salário, mesmo que o vale não tenha sido pago
     // — atraso é assunto de `atrasado`, não da data que a lista mostra.
-    // A data que a linha mostra em destaque precisa explicar o status ao lado
-    // dela. Quando há atraso, é sempre a do salário — mostrar o vale (futuro)
-    // colado num alerta vermelho faz parecer que o vale é que está atrasado,
-    // mesmo quando o dia dele nem chegou.
-    proximaData: !atrasado && dataVale && hoje <= dataVale ? dataVale : dataPagamento,
-    proximaEhVale: !atrasado && Boolean(dataVale) && hoje <= dataVale,
+    // A data em destaque é a próxima conta a vencer, e precisa explicar o
+    // status ao lado dela.
+    //
+    // Com atraso é sempre a do salário: mostrar o vale (futuro) colado num
+    // alerta vermelho faz parecer que o vale é que está atrasado.
+    //
+    // Sem atraso, vence a MENOR das duas datas ainda por chegar — não basta
+    // perguntar "o vale já passou?", porque o vale pode cair antes do salário
+    // (vale dia 20, salário dia 5 do mês seguinte é arranjo comum). Comparar
+    // as duas é o que faz a lista mostrar de fato o que vem primeiro.
+    proximaData: proxima.data,
+    proximaEhVale: proxima.ehVale,
     faltaVale,
     // Enquanto o vale não fechou, é ele que o campo sugere — mesmo depois do
     // dia dele ter passado: um vale atrasado continua sendo a próxima conta a

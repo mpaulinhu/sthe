@@ -808,3 +808,54 @@ describe('a data em destaque explica o status', () => {
     expect(s.dataVale).toBe(`${PERIOD}-20`)
   })
 })
+
+describe('destaque = a menor das duas datas por vencer', () => {
+  const FUTURO = '2099-01'
+  const noFuturo = (kind: EntryKind, amount: number) => ({
+    ...entry(kind, amount, false),
+    period: FUTURO,
+    date: `${FUTURO}-05`,
+  })
+
+  it('vale dia 20 e salário dia 5: o destaque é o dia 5', () => {
+    // O bug que isso trava: a regra antiga só perguntava "o vale já passou?",
+    // então escolhia o vale mesmo quando o salário caía antes dele.
+    const s = summarizePerson(
+      person({ payDay: 5, advance: { day: 20, percent: 40 } }),
+      [noFuturo('salario', 2000)],
+      FUTURO,
+    )
+    expect(s.proximaEhVale).toBe(false)
+    expect(s.proximaData).toBe(`${FUTURO}-05`)
+  })
+
+  it('vale dia 10 e salário dia 25: o destaque é o vale', () => {
+    const s = summarizePerson(
+      person({ payDay: 25, advance: { day: 10, percent: 40 } }),
+      [noFuturo('salario', 2000)],
+      FUTURO,
+    )
+    expect(s.proximaEhVale).toBe(true)
+    expect(s.proximaData).toBe(`${FUTURO}-10`)
+  })
+
+  it('mesmo dia para os dois: o vale ganha, por ser a primeira parcela', () => {
+    const s = summarizePerson(
+      person({ payDay: 20, advance: { day: 20, percent: 40 } }),
+      [noFuturo('salario', 2000)],
+      FUTURO,
+    )
+    expect(s.proximaEhVale).toBe(true)
+  })
+
+  it('vale já quitado sai do destaque, mesmo caindo antes', () => {
+    const s = summarizePerson(
+      person({ payDay: 25, advance: { day: 10, percent: 40 } }),
+      [noFuturo('salario', 2000), { ...noFuturo('vale', 800), paid: true }],
+      FUTURO,
+    )
+    expect(s.faltaVale).toBe(0)
+    expect(s.proximaEhVale).toBe(false)
+    expect(s.proximaData).toBe(`${FUTURO}-25`)
+  })
+})
